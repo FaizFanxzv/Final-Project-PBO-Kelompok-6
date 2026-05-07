@@ -185,15 +185,14 @@ Wave 10 → Zombie menyerang setiap 3 detik ← PUNCAK KEGANASAN
 | Layar pilih karakter | ✅ |
 | Layar pilih map | ✅ |
 | Indikator HP real-time | ✅ |
-| Notifikasi wave berikutnya | ✅ |
 | Animasi zombie menyerang | ✅ |
 | Save / Load progress | ✅ |
+| BGM & sound effect per map | ✅ |
 
 ### Dalam Pengembangan
 
 | Fitur | Status |
 |-------|--------|
-| BGM & sound effect per map | 🚧 |
 | Cutscene intro & ending | 🚧 |
 | Leaderboard skor | 🚧 |
 | Animasi karakter unik per hero | 🚧 |
@@ -208,17 +207,15 @@ cd LastChanceForLife
 mvn javafx:run
 ```
 
-**Requirements:** JDK 25+, Maven 3.9+, JavaFX 25
+**Requirements:** JDK 25+, Netbeans 14
 
 ### Kontrol
 
 | Tombol | Aksi |
 |--------|------|
-| `←` / `→` | Gerak kiri / kanan |
-| `↑` / `↓` | Gerak maju / mundur |
-| `Z` / `Space` | Serang |
-| `X` | Gunakan skill / buff |
-| `ESC` | Pause / Menu |
+| `A` / `D` | Gerak kiri / kanan |
+| `Space` | Serang |
+| `ESC` / `P` | Pause |
 
 ---
 
@@ -271,9 +268,9 @@ lastchanceforlife/
 |------|-----|-------|
 | Muhammad Faiz Risqullah Ramadhan | 25050974116 | Project Lead & Game Logic |
 | Ahmad Khadik Mustawan 'Alwi | 25050974121 | UI/UX & Scene Management |
-| Bunga Aulia Maharani | 25050974122 | Entity & Combat System |
+| Bunga Aulia Maharani | 25050974122 | Logic Program Flow |
 | Varsaretha Najmi Rohadatul Aisy | 25050974124 | Entity & Combat System |
-| Arafina A'azahra | 25050974130 | Entity & Combat System |
+| Arafina A'azahra | 25050974130 | Animation and Character Maker |
 
 ---
 
