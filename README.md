@@ -3,7 +3,7 @@
 **Turn-Based RPG Zombie Survival — Bertahan atau Binasa**
 
 [![Version](https://img.shields.io/badge/versi-v2.0.0-FFB830?style=for-the-badge)](https://github.com/)
-[![Java](https://img.shields.io/badge/Java-25-ED8B00?style=for-the-badge&logo=openjdk)](https://github.com/)
+[![Java](https://img.shields.io/badge/Java-14-ED8B00?style=for-the-badge&logo=openjdk)](https://github.com/)
 [![Status](https://img.shields.io/badge/status-Final-2D7A45?style=for-the-badge)](https://github.com/)
 [![PBO](https://img.shields.io/badge/Tugas%20Akhir-PBO-CC3300?style=for-the-badge)](https://github.com/)
 [![Genre](https://img.shields.io/badge/Genre-Turn--Based%20RPG-7755BB?style=for-the-badge)](https://github.com/)
