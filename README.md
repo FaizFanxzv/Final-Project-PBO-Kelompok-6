@@ -4,7 +4,6 @@
 
 [![Version](https://img.shields.io/badge/versi-v2.0.0-FFB830?style=for-the-badge)](https://github.com/)
 [![Java](https://img.shields.io/badge/Java-25-ED8B00?style=for-the-badge&logo=openjdk)](https://github.com/)
-[![JavaFX](https://img.shields.io/badge/JavaFX-25-0096C7?style=for-the-badge)](https://github.com/)
 [![Status](https://img.shields.io/badge/status-Final-2D7A45?style=for-the-badge)](https://github.com/)
 [![PBO](https://img.shields.io/badge/Tugas%20Akhir-PBO-CC3300?style=for-the-badge)](https://github.com/)
 [![Genre](https://img.shields.io/badge/Genre-Turn--Based%20RPG-7755BB?style=for-the-badge)](https://github.com/)
@@ -128,7 +127,7 @@ Wave 10 → Zombie menyerang setiap 3 detik ← PUNCAK KEGANASAN
 - Zombie aktif **maju menyerang** player (tidak diam di tempat)
 - Setiap zombie memberikan **damage tiap 3 detik** saat berhasil menjangkau player
 - Interval serangan **memendek setiap wave** hingga minimum 3 detik di wave terakhir
-- Jumlah zombie per wave **bertambah** setiap gelombang
+- Tingkat pangkat zombie per wave **bertambah** setiap gelombang
 
 ---
 
@@ -163,7 +162,7 @@ Wave 10 → Zombie menyerang setiap 3 detik ← PUNCAK KEGANASAN
 | 5 karakter player dengan passive unik | ✅ |
 | Sistem zombie wave (interval 10s → 3s) | ✅ |
 | Zombie aktif maju & memberikan damage | ✅ |
-| Kontrol keys maju/mundur saat battle | 🔧 Diperbaiki |
+| Kontrol keys maju/mundur saat battle | ✅ |
 | Sistem buff 7 jenis | ✅ |
 | Invisible / dodge mechanic | ✅ |
 | Lifesteal mechanic (Xavier & buff) | ✅ |
@@ -207,7 +206,7 @@ cd LastChanceForLife
 mvn javafx:run
 ```
 
-**Requirements:** JDK 25+, Netbeans 14
+**Requirements:** JDK 8, Netbeans 14
 
 ### Kontrol
 
@@ -216,26 +215,41 @@ mvn javafx:run
 | `A` / `D` | Gerak kiri / kanan |
 | `Space` | Serang |
 | `ESC` / `P` | Pause |
+| `H` | Heal |
 
 ---
 
 ## 🏗️ Arsitektur Project
 
 ```
-lastchanceforlife/
-├── engine/          → GameEngine, WaveManager, BattleController
-├── entity/
-│   ├── player/      → UnesaBoys, UnesaGirls, KnightPrince, Raymond, Xavier
-│   └── enemy/       → Zombie, ZombieBoss, ZombossMinion
-├── map/             → MapUnesa, MapForest, MapFrozen, MapMountain, MapZomboss
-├── buff/            → BuffManager, BuffEffect (7 jenis buff)
-├── combat/          → TurnManager, DamageCalculator, InvisibleSystem, LifestealSystem
-├── save/            → SaveManager, GameState
-└── ui/
-    ├── MainApp.java            → Entry point (1280×720)
-    ├── controller/SceneRouter  → Scene management
-    ├── util/UIFactory          → Komponen reusable
-    └── view/                   → CharacterSelect, MapSelect, Battle, GameOver
+LastChanceForLifeV2/
+├── CharacterSettings/
+│   ├── Character.java
+│   ├── Player.java
+│   ├── Zombie.java
+│   └── Zomboss.java
+│
+├── Database/
+│   ├── DatabaseManager.java
+│   └── SessionManager.java
+│
+├── GUI/
+│   ├── AnimationEngine.java
+│   ├── AssetConfig.java
+│   ├── AuthScreen.java
+│   ├── BuffDialog.java
+│   ├── GamePanel.java
+│   ├── Main.java
+│   ├── PreGameScreen.java
+│   └── SoundManager.java
+│
+└── ImageAssets/
+    ├── sounds/
+    ├── 41530.jpg
+    ├── FROZEN.png
+    ├── Hell.jpg
+    ├── Knight_Prince.png
+    └── ...
 ```
 
 **Design Patterns yang digunakan:** Observer, Factory, Strategy, Template Method, State Machine, Singleton
