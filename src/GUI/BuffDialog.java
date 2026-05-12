@@ -380,7 +380,7 @@ public class BuffDialog extends JDialog {
             } else {
                 p.setLastChance(true);
                 listBuff.remove(buffDiambil);
-                pesan = "Bangkit sekali saat mati!\nMendapat 25% dari MaxHP.";
+                pesan = "Bangkit sekali saat mati!\nMendapat 100% dari MaxHP.";
             }
 
         } else if (buffDiambil.contains("Lifesteal")) {

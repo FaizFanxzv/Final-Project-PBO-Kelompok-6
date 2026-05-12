@@ -60,11 +60,11 @@ public class SoundManager {
         SOUND_PATHS.put(DEATH,       "/ImageAssets/sounds/death.wav");
         SOUND_PATHS.put(WAVE_CLEAR,  "/ImageAssets/sounds/wave_clear.wav");
         SOUND_PATHS.put(WAVE_START,  "/ImageAssets/sounds/wave_start.wav");
-        // SOUND_PATHS.put(MISS,        "/ImageAssets/sounds/miss.wav");
+        SOUND_PATHS.put(MISS,        "/ImageAssets/sounds/miss.wav");
         SOUND_PATHS.put(BUFF_SELECT, "/ImageAssets/sounds/buff_select.wav");
-        // SOUND_PATHS.put(LAST_CHANCE, "/ImageAssets/sounds/last_chance.wav");
+        SOUND_PATHS.put(LAST_CHANCE, "/ImageAssets/sounds/last_chance.wav");
         SOUND_PATHS.put(GAME_OVER,   "/ImageAssets/sounds/game_over.wav");
-        // SOUND_PATHS.put(VICTORY,     "/ImageAssets/sounds/victory.wav");
+        SOUND_PATHS.put(VICTORY,     "/ImageAssets/sounds/victory.wav");
 
         // BGM per map [PENGEMBANGAN #4]
         SOUND_PATHS.put(BGM_MAIN,    "/ImageAssets/sounds/bgm_main.wav");

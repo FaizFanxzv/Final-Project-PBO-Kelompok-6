@@ -1,12 +1,14 @@
 package GUI;
 
 /**
- * AssetConfig v4 — Konfigurasi aset & konstanta game terpusat.
+ * AssetConfig v5 — Konfigurasi aset & konstanta game terpusat.
  *
- * PERUBAHAN v4:
- *  [1] Konstanta ukuran render karakter & enemy (PERBAIKAN #4: custom image size)
- *  [2] Konstanta ukuran kartu karakter di PreGameScreen
- *  [3] Semua perubahan v3 tetap ada
+ * PERUBAHAN v5:
+ *  [1] Blok "KONFIGURASI UKURAN GAMBAR" dikelompokkan dengan komentar
+ *      penjelasan yang lengkap — mudah dicari dan diubah.
+ *  [2] Tambah PLAYER_RENDER_OFFSET_X agar posisi horizontal player
+ *      juga bisa digeser tanpa menyentuh AnimationEngine.
+ *  [3] Petunjuk contoh penggunaan disertakan sebagai komentar inline.
  */
 public class AssetConfig {
 
@@ -15,37 +17,91 @@ public class AssetConfig {
     // ============================================================
     public static final String BG_PREGAME = "/ImageAssets/bg_pregame.jpg";
 
+
     // ============================================================
-    // UKURAN RENDER KARAKTER (PERBAIKAN #4 — Custom Image Size)
+    //  KONFIGURASI UKURAN & POSISI GAMBAR
+    //  ↓↓↓ UBAH NILAI DI SINI SESUAI KEBUTUHAN ↓↓↓
     // ============================================================
 
+    // ── PLAYER ───────────────────────────────────────────────────────────
     /**
-     * Ukuran RENDER player di game panel (bisa diubah bebas).
-     * Default sebelumnya mengikuti PLAYER_W/H di AnimationEngine.
-     * Sekarang dipisah agar bisa dikustomisasi tanpa ubah hitbox.
+     * Lebar render gambar player di canvas game (piksel).
+     * Naikkan jika gambar terasa terlalu kecil, turunkan jika terlalu besar.
+     * Default: 200
      */
-    public static int PLAYER_RENDER_W = 200;  // lebar render gambar player
-    public static int PLAYER_RENDER_H = 200;  // tinggi render gambar player
+    public static int PLAYER_RENDER_W = 200;
 
     /**
-     * Ukuran RENDER enemy di game panel.
+     * Tinggi render gambar player di canvas game (piksel).
+     * Default: 200
      */
-    public static int ENEMY_RENDER_W  = 180;  // lebar render gambar enemy
-    public static int ENEMY_RENDER_H  = 180;  // tinggi render gambar enemy
+    public static int PLAYER_RENDER_H = 200;
 
     /**
-     * Offset Y render enemy dari posisi base.
-     * Berguna jika gambar zombie terlalu tinggi/rendah.
+     * Geser posisi X player dari PLAYER_BASE_X (piksel).
+     * Positif = geser ke kanan, negatif = geser ke kiri.
+     * Default: 0 (tidak digeser)
+     */
+    public static int PLAYER_RENDER_OFFSET_X = 0;
+
+    /**
+     * Geser posisi Y player dari PLAYER_BASE_Y (piksel).
+     * Positif = geser ke bawah, negatif = geser ke atas.
+     * Default: 0 (tidak digeser)
+     */
+    public static int PLAYER_RENDER_OFFSET_Y = 0;
+
+    // ── ENEMY / ZOMBIE ────────────────────────────────────────────────────
+    /**
+     * Lebar render gambar enemy di canvas game (piksel).
+     * Default: 180
+     */
+    public static int ENEMY_RENDER_W = 180;
+
+    /**
+     * Tinggi render gambar enemy di canvas game (piksel).
+     * Default: 180
+     */
+    public static int ENEMY_RENDER_H = 180;
+
+    /**
+     * Geser posisi Y enemy dari ENEMY_BASE_Y (piksel).
+     * Positif = geser ke bawah, negatif = geser ke atas.
+     * Default: 0 (tidak digeser)
+     *
+     * Contoh: jika zombie terasa "melayang", set ke 20 untuk turunkan.
      */
     public static int ENEMY_RENDER_OFFSET_Y = 0;
 
+    // ── KARTU KARAKTER DI PREGAME SCREEN ─────────────────────────────────
     /**
-     * Ukuran gambar karakter di kartu PreGameScreen.
-     * CHAR_CARD_IMG_W: lebar gambar dalam kartu.
-     * CHAR_CARD_IMG_RATIO: rasio tinggi/lebar (misal 1.0 = kotak, 1.3 = portrait).
+     * Lebar gambar di dalam kartu karakter pada layar PreGame (piksel).
+     * Default: 100
      */
-    public static final int   CHAR_CARD_IMG_W     = 100; // px lebar gambar di kartu
-    public static final float CHAR_CARD_IMG_RATIO  = 1.2f; // tinggi = W * ratio
+    public static final int CHAR_CARD_IMG_W = 100;
+
+    /**
+     * Rasio tinggi/lebar gambar di kartu karakter.
+     * 1.0 = kotak, 1.2 = sedikit portrait, 1.5 = portrait penuh.
+     * Default: 1.2
+     */
+    public static final float CHAR_CARD_IMG_RATIO = 1.2f;
+
+    // ── CONTOH PENGGUNAAN ─────────────────────────────────────────────────
+    // Untuk mengubah ukuran, cukup edit nilai di atas lalu compile ulang.
+    // Contoh:
+    //
+    //   PLAYER_RENDER_W = 240;        // player lebih lebar
+    //   PLAYER_RENDER_H = 240;        // player lebih tinggi
+    //   PLAYER_RENDER_OFFSET_Y = -10; // player naik 10px
+    //
+    //   ENEMY_RENDER_W  = 150;        // zombie lebih kecil
+    //   ENEMY_RENDER_H  = 200;        // zombie lebih jangkung
+    //   ENEMY_RENDER_OFFSET_Y = 15;   // zombie turun 15px
+    //
+    //  Tidak perlu menyentuh AnimationEngine, GamePanel, atau file lain.
+    // ─────────────────────────────────────────────────────────────────────
+
 
     // ============================================================
     // KARAKTER PLAYER — 5 pilihan
@@ -296,32 +352,30 @@ public class AssetConfig {
     }
 
     // ============================================================
-    // OPACITY BACKGROUND PER MAP (PERBAIKAN #3 — Unesa kontras)
+    // OPACITY BACKGROUND PER MAP
     // ============================================================
 
     /**
      * Alpha overlay hitam di atas background map dalam game.
      * Nilai 0–255. Semakin tinggi = makin gelap = karakter lebih terlihat.
-     * UNESA di-set lebih gelap agar zombie kontras dengan background terang.
      */
     public static int getMapBgDimAlpha(String mapKey) {
         switch (mapKey) {
-            case "UNESA":       return 80;   // lebih gelap dari biasanya
+            case "UNESA":       return 80;
             case "ZOMBOSS_MAP": return 40;
             case "FROZEN":      return 25;
             case "MOUNTAIN":    return 20;
-            default:            return 0;    // Forest = tidak di-dim
+            default:            return 0;
         }
     }
 
     /**
      * Warna tint overlay (tambahan di atas dim hitam).
-     * UNESA: sedikit ungu/biru agar zombie warna cerah kontras.
      * null = tidak ada tint.
      */
     public static java.awt.Color getMapBgTint(String mapKey) {
         switch (mapKey) {
-            case "UNESA": return new java.awt.Color(10, 5, 30, 40); // tint gelap ungu
+            case "UNESA": return new java.awt.Color(10, 5, 30, 40);
             default:      return null;
         }
     }

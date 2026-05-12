@@ -9,12 +9,12 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * AnimationEngine v4 — Mesin animasi terpusat game.
+ * AnimationEngine v5 — Mesin animasi terpusat game.
  *
- * PERBAIKAN v4:
- *  [1] hasMoved() — tracking apakah player pernah menekan A/D
- *  [2] FocusListener — auto-request focus saat panel diklik
- *  [3] Semua perbaikan v3 tetap ada
+ * PERUBAHAN v5:
+ *  [1] Keyboard SPACE → trigger tombol Attack (doClick)
+ *  [2] Keyboard H     → trigger tombol Heal   (doClick)
+ *  [3] Semua perbaikan v4 tetap ada
  */
 public class AnimationEngine {
 
@@ -77,7 +77,7 @@ public class AnimationEngine {
     private static final int MOVE_SPEED = 5;
     private boolean movementEnabled = true;
 
-    // PERBAIKAN #5: tracking apakah player sudah pernah bergerak
+    // tracking apakah player sudah pernah bergerak
     private boolean playerHasMoved = false;
 
     // ── Freeze ──────────────────────────────────────────────────────────
@@ -120,7 +120,6 @@ public class AnimationEngine {
         });
         animTimer.start();
 
-        // PERBAIKAN #5: Setup focus yang benar
         panel.setFocusable(true);
         panel.setRequestFocusEnabled(true);
 
@@ -138,12 +137,28 @@ public class AnimationEngine {
                         keyRight = true;
                         playerHasMoved = true;
                         break;
+
+                    // ── v5: SPACE → Attack ──────────────────────────────
+                    case KeyEvent.VK_SPACE:
+                        if (btnAttack != null && btnAttack.isEnabled()) {
+                            btnAttack.doClick();
+                        }
+                        break;
+
+                    // ── v5: H → Heal ────────────────────────────────────
+                    case KeyEvent.VK_H:
+                        if (btnHeal != null && btnHeal.isEnabled()) {
+                            btnHeal.doClick();
+                        }
+                        break;
+
                     case KeyEvent.VK_P:
                     case KeyEvent.VK_ESCAPE:
                         togglePause();
                         break;
                 }
             }
+
             @Override
             public void keyReleased(KeyEvent e) {
                 switch (e.getKeyCode()) {
@@ -153,7 +168,7 @@ public class AnimationEngine {
             }
         });
 
-        // PERBAIKAN #5: Saat panel diklik, ambil focus
+        // Saat panel diklik, ambil focus
         panel.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
@@ -161,7 +176,7 @@ public class AnimationEngine {
             }
         });
 
-        // PERBAIKAN #5: Saat panel masuk tampilan, minta focus
+        // Saat panel masuk tampilan, minta focus
         panel.addHierarchyListener(e -> {
             if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0
                     && panel.isShowing()) {
@@ -287,8 +302,6 @@ public class AnimationEngine {
     public boolean isFrozen()           { return frozen; }
     public void setMovementEnabled(boolean e) { movementEnabled = e; }
     public void stopTimer()             { animTimer.stop(); }
-
-    /** PERBAIKAN #5: Apakah player sudah pernah menekan A/D? */
     public boolean hasMoved()           { return playerHasMoved; }
 
     // ════════════════════════════════════════════════════════════════════
@@ -707,7 +720,8 @@ public class AnimationEngine {
 
         g2c.setFont(new Font("Arial",Font.ITALIC,13));
         g2c.setColor(new Color(140,140,140));
-        String ctrl="[A/D: gerak | Dekat zombie = Proximity Damage!]";
+        // ── v5: update hint keyboard ──
+        String ctrl="[A/D: gerak | SPACE: serang | H: heal | P: pause]";
         FontMetrics fm3=g2c.getFontMetrics();
         g2c.drawString(ctrl,(W-fm3.stringWidth(ctrl))/2,H/2+60);
         g2c.dispose();

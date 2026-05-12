@@ -7,10 +7,16 @@ import java.security.MessageDigest;
 import java.util.*;
 
 /**
- * DatabaseManager v2 — Pure Java file-based database.
+ * DatabaseManager v3 — Pure Java file-based database.
  *
- * ✅ TIDAK BUTUH JAR EKSTERNAL APAPUN.
- *    Menggunakan java.util.Properties + java.security.MessageDigest (SHA-256).
+ * PERUBAHAN v3 — Perbaikan unlock logic:
+ *
+ *   FOREST  menang          → buka Map Unesa + Unesa Boys
+ *   UNESA   wave >= 5       → buka Unesa Girls  (tidak harus menang)
+ *   UNESA   menang          → buka Map Frozen + Raymond
+ *   FROZEN  menang          → buka Map Mountain + Xavier
+ *   MOUNTAIN menang         → buka Map Zomboss
+ *   ZOMBOSS_MAP menang      → semua sudah terbuka (tidak ada unlock baru)
  *
  * STRUKTUR FILE (dibuat otomatis di folder "data/"):
  *   data/users.properties          → daftar akun
@@ -174,40 +180,89 @@ public class DatabaseManager {
         } catch (IOException e) { System.err.println("[DB] saveProgress: " + e.getMessage()); }
     }
 
-    /** Simpan hasil akhir game dan terapkan unlock. */
+    /**
+     * Simpan hasil akhir game dan terapkan unlock.
+     *
+     * Dipanggil dari GamePanel setelah game selesai (menang ATAU kalah).
+     * Unlock hanya diterapkan saat won == true,
+     * KECUALI Unesa Girls yang terbuka saat wave >= 5 meski kalah.
+     */
     public void saveGameResult(int userId, String mapKey, int wavesReached, boolean won) {
         GameProgress gp = getProgress(userId);
         gp.gamesCompleted++;
         gp.highestWave = Math.max(gp.highestWave, wavesReached);
-        if (won) { gp.totalWins++; applyUnlocks(gp, mapKey, wavesReached); }
+
+        // ── Unlock khusus: Unesa Girls terbuka saat wave 5+ di Unesa
+        //    (tidak harus menang — cukup bertahan sampai wave 5)
+        if ("UNESA".equals(mapKey) && wavesReached >= 5) {
+            if (!gp.unlockUnesaGirls) {
+                gp.unlockUnesaGirls = true;
+                System.out.println("[DB] Unlock: Unesa Girls (bertahan wave " + wavesReached + " di Unesa)");
+            }
+        }
+
+        // ── Unlock lain hanya kalau MENANG ──────────────────────────────
+        if (won) {
+            gp.totalWins++;
+            applyUnlocks(gp, mapKey, wavesReached);
+        }
+
         saveProgress(userId, gp);
         System.out.println("[DB] Hasil disimpan → map=" + mapKey
                 + "  wave=" + wavesReached + "  won=" + won);
     }
 
+    /**
+     * Terapkan unlock berdasarkan map yang berhasil diselesaikan (menang).
+     *
+     * Rantai unlock:
+     *   Forest   menang → Unesa (map) + Unesa Boys (karakter)
+     *   Unesa    menang → Frozen (map) + Raymond (karakter)
+     *   Frozen   menang → Mountain (map) + Xavier (karakter)
+     *   Mountain menang → Zomboss Map (map)
+     *   Zomboss  menang → tidak ada unlock baru (semua sudah terbuka)
+     *
+     * Catatan: Unesa Girls dihandle di saveGameResult (wave 5+, tidak harus menang).
+     */
     private void applyUnlocks(GameProgress gp, String mapKey, int wave) {
-        // Forest Wave 10 → semua unlock
-        if ("FOREST".equals(mapKey) && wave >= 10) {
-            gp.unlockUnesaBoys   = true;
-            gp.unlockUnesaGirls  = true;
-            gp.unlockRaymond     = true;
-            gp.unlockXavier      = true;
-            gp.unlockUnesa       = true;
-            gp.unlockFrozen      = true;
-            gp.unlockMountain    = true;
-            gp.unlockZombossMap  = true;
-            System.out.println("[DB] Semua karakter & map di-unlock!");
-            return;
+        switch (mapKey) {
+
+            case "FOREST":
+                // Menang di Forest → buka Map Unesa + Unesa Boys
+                gp.unlockUnesa     = true;
+                gp.unlockUnesaBoys = true;
+                System.out.println("[DB] Unlock: Map Unesa + Unesa Boys");
+                break;
+
+            case "UNESA":
+                // Menang di Unesa → buka Map Frozen + Raymond
+                gp.unlockFrozen  = true;
+                gp.unlockRaymond = true;
+                System.out.println("[DB] Unlock: Map Frozen + Raymond");
+                break;
+
+            case "FROZEN":
+                // Menang di Frozen → buka Map Mountain + Xavier
+                gp.unlockMountain = true;
+                gp.unlockXavier   = true;
+                System.out.println("[DB] Unlock: Map Mountain + Xavier");
+                break;
+
+            case "MOUNTAIN":
+                // Menang di Mountain → buka Map Zomboss (map terakhir)
+                gp.unlockZombossMap = true;
+                System.out.println("[DB] Unlock: Map Zomboss (map final)");
+                break;
+
+            case "ZOMBOSS_MAP":
+                // Semua sudah terbuka — tidak ada unlock baru
+                System.out.println("[DB] Menang di Zomboss! Semua konten sudah terbuka.");
+                break;
+
+            default:
+                System.out.println("[DB] applyUnlocks: map tidak dikenal = " + mapKey);
+                break;
         }
-        // Forest Wave Completed → Unesa Boys/Girls + Map Unesa
-        if ("FOREST".equals(mapKey) && wave >= 5) {
-            gp.unlockUnesaBoys  = true;
-            gp.unlockUnesaGirls = true;
-            gp.unlockUnesa      = true;
-        }
-        if ("UNESA".equals(mapKey))    { gp.unlockFrozen   = true; gp.unlockRaymond    = true; }
-        if ("FROZEN".equals(mapKey))   { gp.unlockMountain  = true; gp.unlockXavier    = true; }
-        if ("MOUNTAIN".equals(mapKey)) { gp.unlockZombossMap = true; }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -238,12 +293,12 @@ public class DatabaseManager {
         // Karakter (Knight Prince selalu terbuka)
         public boolean unlockUnesaBoys    = false;
         public boolean unlockUnesaGirls   = false;
-        public boolean unlockKnightPrince = true;
+        public boolean unlockKnightPrince = true;   // selalu true
         public boolean unlockRaymond      = false;
         public boolean unlockXavier       = false;
 
         // Map (Forest selalu terbuka)
-        public boolean unlockForest     = true;
+        public boolean unlockForest     = true;     // selalu true
         public boolean unlockUnesa      = false;
         public boolean unlockFrozen     = false;
         public boolean unlockMountain   = false;
@@ -273,13 +328,17 @@ public class DatabaseManager {
             }
         }
 
+        /**
+         * Petunjuk cara membuka konten yang masih terkunci.
+         * Ditampilkan di PreGameScreen saat user klik item terkunci.
+         */
         public String getUnlockHint(String key) {
             switch (key) {
-                case "UNESA_BOYS":
-                case "UNESA_GIRLS": return "Menangkan Map Forest";
+                case "UNESA_BOYS":  return "Menangkan Map Forest";
+                case "UNESA_GIRLS": return "Bertahan hingga Wave 5 di Map Unesa";
                 case "RAYMOND":     return "Menangkan Map Unesa";
                 case "XAVIER":      return "Menangkan Map Frozen";
-                case "UNESA":       return "Menangkan Forest";
+                case "UNESA":       return "Menangkan Map Forest";
                 case "FROZEN":      return "Menangkan Map Unesa";
                 case "MOUNTAIN":    return "Menangkan Map Frozen";
                 case "ZOMBOSS_MAP": return "Menangkan Map Mountain";
