@@ -7,33 +7,25 @@ import java.security.MessageDigest;
 import java.util.*;
 
 /**
- * DatabaseManager v3 — Pure Java file-based database.
+ * DatabaseManager v4 — Pure Java file-based database.
  *
- * PERUBAHAN v3 — Perbaikan unlock logic:
- *
- *   FOREST  menang          → buka Map Unesa + Unesa Boys
- *   UNESA   wave >= 5       → buka Unesa Girls  (tidak harus menang)
- *   UNESA   menang          → buka Map Frozen + Raymond
- *   FROZEN  menang          → buka Map Mountain + Xavier
- *   MOUNTAIN menang         → buka Map Zomboss
- *   ZOMBOSS_MAP menang      → semua sudah terbuka (tidak ada unlock baru)
- *
- * STRUKTUR FILE (dibuat otomatis di folder "data/"):
- *   data/users.properties          → daftar akun
- *   data/counter.properties        → auto-increment user id
- *   data/progress_[id].properties  → progress tiap user
+ * PERUBAHAN v4:
+ *  [1] Tambah field storyXShown di GameProgress untuk tracking cerita yang sudah ditampilkan.
+ *  [2] Tambah recentAccounts di file terpisah (recent_accounts.properties)
+ *      untuk fitur "akun yang pernah login" di AuthScreen.
+ *  [3] Unlock logic v3 tetap tidak berubah.
  */
 public class DatabaseManager {
 
-    private static final String DATA_DIR     = "data";
-    private static final String USERS_FILE   = DATA_DIR + "/users.properties";
-    private static final String COUNTER_FILE = DATA_DIR + "/counter.properties";
+    private static final String DATA_DIR       = "data";
+    private static final String USERS_FILE     = DATA_DIR + "/users.properties";
+    private static final String COUNTER_FILE   = DATA_DIR + "/counter.properties";
+    private static final String RECENT_FILE    = DATA_DIR + "/recent_accounts.properties";
+    private static final int    MAX_RECENT     = 5;
 
     private static DatabaseManager instance;
 
-    private DatabaseManager() {
-        ensureDataDir();
-    }
+    private DatabaseManager() { ensureDataDir(); }
 
     public static DatabaseManager getInstance() {
         if (instance == null) instance = new DatabaseManager();
@@ -87,10 +79,6 @@ public class DatabaseManager {
     // AUTH — REGISTER & LOGIN
     // ─────────────────────────────────────────────────────────────────────
 
-    /**
-     * Register akun baru.
-     * @return true jika berhasil, false jika username sudah dipakai.
-     */
     public synchronized boolean register(String username, String password) {
         if (username == null || username.trim().isEmpty()) return false;
         if (password == null || password.length() < 4)    return false;
@@ -101,53 +89,43 @@ public class DatabaseManager {
 
         int    id   = nextUserId();
         String hash = sha256(password);
-        // Format: passwordHash|userId|displayName
         users.setProperty(key, hash + "|" + id + "|" + username.trim());
         saveUsers(users);
-
-        // Buat progress default
         saveProgress(id, new GameProgress());
         System.out.println("[DB] Akun dibuat: " + username + " (id=" + id + ")");
         return true;
     }
 
-    /**
-     * Login.
-     * @return userId (> 0) jika berhasil, -1 jika gagal.
-     */
     public int login(String username, String password) {
         if (username == null || password == null) return -1;
         String key = username.trim().toLowerCase();
-
         Properties users = loadUsers();
         String entry = users.getProperty(key);
         if (entry == null) return -1;
 
         String[] parts = entry.split("\\|", 3);
         if (parts.length < 2) return -1;
-
         if (!sha256(password).equals(parts[0])) return -1;
 
         int id = Integer.parseInt(parts[1]);
+        // Simpan ke daftar akun terakhir
+        recordRecentAccount(username.trim(), id);
         System.out.println("[DB] Login berhasil: " + username + " (id=" + id + ")");
         return id;
     }
 
-    /** Apakah username sudah terdaftar? */
     public boolean usernameExists(String username) {
         if (username == null) return false;
         return loadUsers().containsKey(username.trim().toLowerCase());
     }
 
-    /** Ambil display name (kapitalisasi asli saat register) */
     public String getDisplayName(int userId) {
         Properties users = loadUsers();
         for (String key : users.stringPropertyNames()) {
             String val = users.getProperty(key);
             String[] parts = val.split("\\|", 3);
-            if (parts.length >= 2 && Integer.parseInt(parts[1]) == userId) {
+            if (parts.length >= 2 && Integer.parseInt(parts[1]) == userId)
                 return parts.length >= 3 ? parts[2] : capitalize(key);
-            }
         }
         return "Hero";
     }
@@ -155,6 +133,77 @@ public class DatabaseManager {
     private String capitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // RECENT ACCOUNTS  [v4 NEW]
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Catat akun yang baru login ke daftar "terakhir digunakan".
+     * Maksimal MAX_RECENT akun, diurutkan dari yang terbaru.
+     */
+    private synchronized void recordRecentAccount(String displayName, int userId) {
+        Properties p = loadRecentAccounts();
+
+        // Hapus entri lama untuk user ini jika ada
+        String toRemove = null;
+        for (String k : p.stringPropertyNames()) {
+            String v = p.getProperty(k);
+            String[] parts = v.split("\\|", 3);
+            if (parts.length >= 2 && parts[1].equals(String.valueOf(userId))) {
+                toRemove = k;
+                break;
+            }
+        }
+        if (toRemove != null) p.remove(toRemove);
+
+        // Geser semua entri ke bawah (slot 0 = paling baru)
+        List<String> existing = new ArrayList<>();
+        for (int i = 0; i < MAX_RECENT; i++) {
+            String v = p.getProperty("recent_" + i);
+            if (v != null) existing.add(v);
+        }
+        // Tambahkan yang baru di depan
+        existing.add(0, displayName + "|" + userId + "|" + System.currentTimeMillis());
+
+        // Simpan kembali (maks MAX_RECENT)
+        p.clear();
+        for (int i = 0; i < Math.min(existing.size(), MAX_RECENT); i++) {
+            p.setProperty("recent_" + i, existing.get(i));
+        }
+        saveRecentAccounts(p);
+    }
+
+    /**
+     * Ambil daftar akun terakhir login.
+     * @return List string "DisplayName|userId|timestamp", paling baru di indeks 0.
+     */
+    public List<String[]> getRecentAccounts() {
+        Properties p = loadRecentAccounts();
+        List<String[]> result = new ArrayList<>();
+        for (int i = 0; i < MAX_RECENT; i++) {
+            String v = p.getProperty("recent_" + i);
+            if (v == null) break;
+            String[] parts = v.split("\\|", 3);
+            if (parts.length >= 2) result.add(parts);
+        }
+        return result;
+    }
+
+    private Properties loadRecentAccounts() {
+        Properties p = new Properties();
+        File f = new File(RECENT_FILE);
+        if (!f.exists()) return p;
+        try (FileInputStream in = new FileInputStream(f)) { p.load(in); }
+        catch (IOException ignored) {}
+        return p;
+    }
+
+    private synchronized void saveRecentAccounts(Properties p) {
+        try (FileOutputStream out = new FileOutputStream(RECENT_FILE)) {
+            p.store(out, "Recent Accounts");
+        } catch (IOException e) { System.err.println("[DB] saveRecentAccounts: " + e.getMessage()); }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -174,91 +223,57 @@ public class DatabaseManager {
         return GameProgress.fromProperties(p);
     }
 
-    private synchronized void saveProgress(int userId, GameProgress gp) {
+    public synchronized void saveProgress(int userId, GameProgress gp) {
         try (FileOutputStream out = new FileOutputStream(progressFile(userId))) {
             gp.toProperties().store(out, "Progress user " + userId);
         } catch (IOException e) { System.err.println("[DB] saveProgress: " + e.getMessage()); }
     }
 
-    /**
-     * Simpan hasil akhir game dan terapkan unlock.
-     *
-     * Dipanggil dari GamePanel setelah game selesai (menang ATAU kalah).
-     * Unlock hanya diterapkan saat won == true,
-     * KECUALI Unesa Girls yang terbuka saat wave >= 5 meski kalah.
-     */
     public void saveGameResult(int userId, String mapKey, int wavesReached, boolean won) {
         GameProgress gp = getProgress(userId);
         gp.gamesCompleted++;
         gp.highestWave = Math.max(gp.highestWave, wavesReached);
 
-        // ── Unlock khusus: Unesa Girls terbuka saat wave 5+ di Unesa
-        //    (tidak harus menang — cukup bertahan sampai wave 5)
         if ("UNESA".equals(mapKey) && wavesReached >= 5) {
             if (!gp.unlockUnesaGirls) {
                 gp.unlockUnesaGirls = true;
-                System.out.println("[DB] Unlock: Unesa Girls (bertahan wave " + wavesReached + " di Unesa)");
+                System.out.println("[DB] Unlock: Unesa Girls (wave " + wavesReached + ")");
             }
         }
 
-        // ── Unlock lain hanya kalau MENANG ──────────────────────────────
         if (won) {
             gp.totalWins++;
             applyUnlocks(gp, mapKey, wavesReached);
         }
 
         saveProgress(userId, gp);
-        System.out.println("[DB] Hasil disimpan → map=" + mapKey
-                + "  wave=" + wavesReached + "  won=" + won);
+        System.out.println("[DB] Hasil disimpan → map=" + mapKey + " wave=" + wavesReached + " won=" + won);
     }
 
-    /**
-     * Terapkan unlock berdasarkan map yang berhasil diselesaikan (menang).
-     *
-     * Rantai unlock:
-     *   Forest   menang → Unesa (map) + Unesa Boys (karakter)
-     *   Unesa    menang → Frozen (map) + Raymond (karakter)
-     *   Frozen   menang → Mountain (map) + Xavier (karakter)
-     *   Mountain menang → Zomboss Map (map)
-     *   Zomboss  menang → tidak ada unlock baru (semua sudah terbuka)
-     *
-     * Catatan: Unesa Girls dihandle di saveGameResult (wave 5+, tidak harus menang).
-     */
     private void applyUnlocks(GameProgress gp, String mapKey, int wave) {
         switch (mapKey) {
-
             case "FOREST":
-                // Menang di Forest → buka Map Unesa + Unesa Boys
                 gp.unlockUnesa     = true;
                 gp.unlockUnesaBoys = true;
                 System.out.println("[DB] Unlock: Map Unesa + Unesa Boys");
                 break;
-
             case "UNESA":
-                // Menang di Unesa → buka Map Frozen + Raymond
                 gp.unlockFrozen  = true;
                 gp.unlockRaymond = true;
                 System.out.println("[DB] Unlock: Map Frozen + Raymond");
                 break;
-
             case "FROZEN":
-                // Menang di Frozen → buka Map Mountain + Xavier
                 gp.unlockMountain = true;
                 gp.unlockXavier   = true;
                 System.out.println("[DB] Unlock: Map Mountain + Xavier");
                 break;
-
             case "MOUNTAIN":
-                // Menang di Mountain → buka Map Zomboss (map terakhir)
                 gp.unlockZombossMap = true;
-                System.out.println("[DB] Unlock: Map Zomboss (map final)");
+                System.out.println("[DB] Unlock: Map Zomboss");
                 break;
-
             case "ZOMBOSS_MAP":
-                // Semua sudah terbuka — tidak ada unlock baru
-                System.out.println("[DB] Menang di Zomboss! Semua konten sudah terbuka.");
+                System.out.println("[DB] Menang di Zomboss! Semua konten terbuka.");
                 break;
-
             default:
                 System.out.println("[DB] applyUnlocks: map tidak dikenal = " + mapKey);
                 break;
@@ -266,7 +281,7 @@ public class DatabaseManager {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // SHA-256 (built-in Java, tanpa library eksternal)
+    // SHA-256
     // ─────────────────────────────────────────────────────────────────────
 
     private static String sha256(String input) {
@@ -277,7 +292,7 @@ public class DatabaseManager {
             for (byte b : hash) sb.append(String.format("%02x", b));
             return sb.toString();
         } catch (Exception e) {
-            throw new RuntimeException("SHA-256 tidak tersedia di JVM ini", e);
+            throw new RuntimeException("SHA-256 tidak tersedia", e);
         }
     }
 
@@ -290,19 +305,26 @@ public class DatabaseManager {
         public int     highestWave      = 0;
         public int     totalWins        = 0;
 
-        // Karakter (Knight Prince selalu terbuka)
+        // Karakter
         public boolean unlockUnesaBoys    = false;
         public boolean unlockUnesaGirls   = false;
-        public boolean unlockKnightPrince = true;   // selalu true
+        public boolean unlockKnightPrince = true;
         public boolean unlockRaymond      = false;
         public boolean unlockXavier       = false;
 
-        // Map (Forest selalu terbuka)
-        public boolean unlockForest     = true;     // selalu true
+        // Map
+        public boolean unlockForest     = true;
         public boolean unlockUnesa      = false;
         public boolean unlockFrozen     = false;
         public boolean unlockMountain   = false;
         public boolean unlockZombossMap = false;
+
+        // Story flags [v4 NEW] — mana story yang sudah ditampilkan
+        public boolean storyNewGameShown     = false;
+        public boolean storyForestWinShown   = false;
+        public boolean storyUnesaWinShown    = false;
+        public boolean storyFrozenWinShown   = false;
+        public boolean storyMountainWinShown = false;
 
         // ── Query ────────────────────────────────────────────────────────
 
@@ -328,10 +350,6 @@ public class DatabaseManager {
             }
         }
 
-        /**
-         * Petunjuk cara membuka konten yang masih terkunci.
-         * Ditampilkan di PreGameScreen saat user klik item terkunci.
-         */
         public String getUnlockHint(String key) {
             switch (key) {
                 case "UNESA_BOYS":  return "Menangkan Map Forest";
@@ -350,37 +368,49 @@ public class DatabaseManager {
 
         Properties toProperties() {
             Properties p = new Properties();
-            p.setProperty("gamesCompleted",   String.valueOf(gamesCompleted));
-            p.setProperty("highestWave",      String.valueOf(highestWave));
-            p.setProperty("totalWins",        String.valueOf(totalWins));
-            p.setProperty("unlockUnesaBoys",    b(unlockUnesaBoys));
-            p.setProperty("unlockUnesaGirls",   b(unlockUnesaGirls));
-            p.setProperty("unlockKnightPrince", b(unlockKnightPrince));
-            p.setProperty("unlockRaymond",      b(unlockRaymond));
-            p.setProperty("unlockXavier",       b(unlockXavier));
-            p.setProperty("unlockForest",       b(unlockForest));
-            p.setProperty("unlockUnesa",        b(unlockUnesa));
-            p.setProperty("unlockFrozen",       b(unlockFrozen));
-            p.setProperty("unlockMountain",     b(unlockMountain));
-            p.setProperty("unlockZombossMap",   b(unlockZombossMap));
+            p.setProperty("gamesCompleted",        String.valueOf(gamesCompleted));
+            p.setProperty("highestWave",           String.valueOf(highestWave));
+            p.setProperty("totalWins",             String.valueOf(totalWins));
+            p.setProperty("unlockUnesaBoys",       b(unlockUnesaBoys));
+            p.setProperty("unlockUnesaGirls",      b(unlockUnesaGirls));
+            p.setProperty("unlockKnightPrince",    b(unlockKnightPrince));
+            p.setProperty("unlockRaymond",         b(unlockRaymond));
+            p.setProperty("unlockXavier",          b(unlockXavier));
+            p.setProperty("unlockForest",          b(unlockForest));
+            p.setProperty("unlockUnesa",           b(unlockUnesa));
+            p.setProperty("unlockFrozen",          b(unlockFrozen));
+            p.setProperty("unlockMountain",        b(unlockMountain));
+            p.setProperty("unlockZombossMap",      b(unlockZombossMap));
+            // Story flags [v4]
+            p.setProperty("storyNewGameShown",     b(storyNewGameShown));
+            p.setProperty("storyForestWinShown",   b(storyForestWinShown));
+            p.setProperty("storyUnesaWinShown",    b(storyUnesaWinShown));
+            p.setProperty("storyFrozenWinShown",   b(storyFrozenWinShown));
+            p.setProperty("storyMountainWinShown", b(storyMountainWinShown));
             return p;
         }
 
         static GameProgress fromProperties(Properties p) {
             GameProgress g = new GameProgress();
-            g.gamesCompleted   = i(p, "gamesCompleted",   0);
-            g.highestWave      = i(p, "highestWave",      0);
-            g.totalWins        = i(p, "totalWins",        0);
-            g.unlockUnesaBoys    = b(p, "unlockUnesaBoys",    false);
-            g.unlockUnesaGirls   = b(p, "unlockUnesaGirls",   false);
-            g.unlockKnightPrince = b(p, "unlockKnightPrince", true);
-            g.unlockRaymond      = b(p, "unlockRaymond",      false);
-            g.unlockXavier       = b(p, "unlockXavier",       false);
-            g.unlockForest       = b(p, "unlockForest",       true);
-            g.unlockUnesa        = b(p, "unlockUnesa",        false);
-            g.unlockFrozen       = b(p, "unlockFrozen",       false);
-            g.unlockMountain     = b(p, "unlockMountain",     false);
-            g.unlockZombossMap   = b(p, "unlockZombossMap",   false);
+            g.gamesCompleted        = i(p, "gamesCompleted",   0);
+            g.highestWave           = i(p, "highestWave",      0);
+            g.totalWins             = i(p, "totalWins",        0);
+            g.unlockUnesaBoys       = b(p, "unlockUnesaBoys",    false);
+            g.unlockUnesaGirls      = b(p, "unlockUnesaGirls",   false);
+            g.unlockKnightPrince    = b(p, "unlockKnightPrince", true);
+            g.unlockRaymond         = b(p, "unlockRaymond",      false);
+            g.unlockXavier          = b(p, "unlockXavier",       false);
+            g.unlockForest          = b(p, "unlockForest",       true);
+            g.unlockUnesa           = b(p, "unlockUnesa",        false);
+            g.unlockFrozen          = b(p, "unlockFrozen",       false);
+            g.unlockMountain        = b(p, "unlockMountain",     false);
+            g.unlockZombossMap      = b(p, "unlockZombossMap",   false);
+            // Story flags [v4]
+            g.storyNewGameShown     = b(p, "storyNewGameShown",     false);
+            g.storyForestWinShown   = b(p, "storyForestWinShown",   false);
+            g.storyUnesaWinShown    = b(p, "storyUnesaWinShown",    false);
+            g.storyFrozenWinShown   = b(p, "storyFrozenWinShown",   false);
+            g.storyMountainWinShown = b(p, "storyMountainWinShown", false);
             return g;
         }
 

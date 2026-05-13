@@ -5,27 +5,18 @@ import java.io.IOException;
 import java.net.URL;
 
 /**
- * SoundManager — Manajemen audio game.
+ * SoundManager v2 — Manajemen audio game.
  *
- * PENGEMBANGAN:
- *  [+] BGM berbeda per map (FOREST, CITY,_FROZEN, VOLCANO, BOSS)
- *  [+] Volume control
- *  [+] Graceful fallback jika file tidak ditemukan
- *
- * FORMAT: .wav (PCM 16-bit, 44100Hz, mono/stereo)
- *
- * CARA PAKAI:
- *   SoundManager.play(SoundManager.ATTACK);
- *   SoundManager.playBGM(SoundManager.BGM_FOREST);
- *   SoundManager.stopBGM();
- *   SoundManager.toggleMute();
+ * PERBAIKAN v2:
+ *  [FIX-SOUND-1] currentBgmName disimpan sehingga BGM bisa di-resume saat unmute.
+ *  [FIX-SOUND-2] toggleMute() sekarang restart BGM ketika unmuting.
+ *  [FIX-SOUND-3] Refactor playBGM → startBgmPlayback agar tidak mengubah currentBgmName.
  */
 public class SoundManager {
 
     // ============================================================
-    // DAFTAR NAMA SUARA — efek & BGM
+    // KONSTANTA NAMA SUARA
     // ============================================================
-    // Efek suara
     public static final String ATTACK      = "attack";
     public static final String HEAL        = "heal";
     public static final String HIT_PLAYER  = "hit_player";
@@ -39,20 +30,19 @@ public class SoundManager {
     public static final String GAME_OVER   = "game_over";
     public static final String VICTORY     = "victory";
 
-    // BGM — satu per map [PENGEMBANGAN #4]
-    public static final String BGM_MAIN  = "bgm_main";    // fallback generic
-    public static final String BGM_BOSS      = "bgm_boss";      // Wave 10 Zomboss
-    public static final String BGM_FOREST    = "bgm_forest";    // Map Hutan
-    public static final String BGM_UNESA      = "bgm_city";      // Map Kota Mati
-    public static final String BGM_FROZEN   = "bgm_FROZEN"; // Map Pemakaman
-    public static final String BGM_VOLCANO   = "bgm_volcano";   // Map Gunung Berapi
+    // BGM
+    public static final String BGM_MAIN    = "bgm_main";
+    public static final String BGM_BOSS    = "bgm_boss";
+    public static final String BGM_FOREST  = "bgm_forest";
+    public static final String BGM_UNESA   = "bgm_city";
+    public static final String BGM_FROZEN  = "bgm_FROZEN";
+    public static final String BGM_VOLCANO = "bgm_volcano";
 
     // ============================================================
-    // PETA PATH SUARA — isi sesuai file .wav yang tersedia
+    // PETA PATH
     // ============================================================
     private static final java.util.Map<String, String> SOUND_PATHS = new java.util.HashMap<>();
     static {
-        // Efek suara
         SOUND_PATHS.put(ATTACK,      "/ImageAssets/sounds/attack.wav");
         SOUND_PATHS.put(HEAL,        "/ImageAssets/sounds/heal.wav");
         SOUND_PATHS.put(HIT_PLAYER,  "/ImageAssets/sounds/hit_player.wav");
@@ -66,24 +56,25 @@ public class SoundManager {
         SOUND_PATHS.put(GAME_OVER,   "/ImageAssets/sounds/game_over.wav");
         SOUND_PATHS.put(VICTORY,     "/ImageAssets/sounds/victory.wav");
 
-        // BGM per map [PENGEMBANGAN #4]
         SOUND_PATHS.put(BGM_MAIN,    "/ImageAssets/sounds/bgm_main.wav");
-        SOUND_PATHS.put(BGM_BOSS,      "/ImageAssets/sounds/bgm_boss.wav");
-        SOUND_PATHS.put(BGM_FOREST,    "/ImageAssets/sounds/bgm_forest.wav");
-        SOUND_PATHS.put(BGM_UNESA,      "/ImageAssets/sounds/bgm_unesa.wav");
-        SOUND_PATHS.put(BGM_FROZEN, "/ImageAssets/sounds/bgm_FROZEN.wav");
-        SOUND_PATHS.put(BGM_VOLCANO,   "/ImageAssets/sounds/bgm_mountain.wav");
+        SOUND_PATHS.put(BGM_BOSS,    "/ImageAssets/sounds/bgm_boss.wav");
+        SOUND_PATHS.put(BGM_FOREST,  "/ImageAssets/sounds/bgm_forest.wav");
+        SOUND_PATHS.put(BGM_UNESA,   "/ImageAssets/sounds/bgm_unesa.wav");
+        SOUND_PATHS.put(BGM_FROZEN,  "/ImageAssets/sounds/bgm_FROZEN.wav");
+        SOUND_PATHS.put(BGM_VOLCANO, "/ImageAssets/sounds/bgm_mountain.wav");
     }
 
-    private static Clip   bgmClip  = null;
-    private static boolean muted   = false;
-    private static float   volume  = 0.8f; // 0.0 – 1.0
+    private static Clip   bgmClip        = null;
+    private static boolean muted         = false;
+    private static float   volume        = 0.8f;
+    // FIX-SOUND-1: simpan nama BGM yang sedang/terakhir dimainkan
+    private static String  currentBgmName = null;
 
     // ============================================================
     // API PUBLIK
     // ============================================================
 
-    /** Putar efek suara sekali (one-shot, tidak interrupt BGM). */
+    /** Putar efek suara sekali (one-shot). */
     public static void play(String soundName) {
         if (muted) return;
         String path = SOUND_PATHS.get(soundName);
@@ -94,7 +85,7 @@ public class SoundManager {
             AudioInputStream ais = AudioSystem.getAudioInputStream(url);
             Clip clip = AudioSystem.getClip();
             clip.open(ais);
-            setClipVolume(clip, volume * 0.85f); // efek sedikit lebih pelan dari BGM
+            setClipVolume(clip, volume * 0.85f);
             clip.start();
             clip.addLineListener(e -> {
                 if (e.getType() == LineEvent.Type.STOP) clip.close();
@@ -103,20 +94,65 @@ public class SoundManager {
     }
 
     /**
-     * Putar music latar (looping). Hentikan BGM sebelumnya.
-     * Jika BGM yang diminta sama dengan yang sedang berjalan, tidak restart.
+     * Putar BGM (looping). Hentikan BGM sebelumnya.
+     * Menyimpan nama BGM untuk keperluan resume saat unmute.
      */
     public static void playBGM(String soundName) {
-        // Jangan restart jika sudah playing track yang sama
-        if (bgmClip != null && bgmClip.isRunning()) {
-            // Tidak ada cara mudah cek nama track di Java Clip,
-            // jadi kita stop & restart — bisa dioptimasi dengan menyimpan currentBgmName
-        }
+        // FIX-SOUND-3: simpan nama SEBELUM stop, lalu panggil startBgmPlayback
+        currentBgmName = soundName;
         stopBGM();
+        startBgmPlayback(soundName);
+    }
+
+    /** Hentikan BGM (clip ditutup, tidak mengubah currentBgmName). */
+    public static void stopBGM() {
+        if (bgmClip != null) {
+            if (bgmClip.isRunning()) bgmClip.stop();
+            bgmClip.close();
+        }
+        bgmClip = null;
+    }
+
+    /**
+     * Toggle mute.
+     * FIX-SOUND-2: Saat unmuting, BGM yang terakhir diputar akan di-resume.
+     */
+    public static void toggleMute() {
+        muted = !muted;
+        if (muted) {
+            stopBGM();
+        } else {
+            // Resume BGM yang terakhir diputar
+            if (currentBgmName != null) {
+                startBgmPlayback(currentBgmName);
+            }
+        }
+    }
+
+    /** Set volume global (0.0–1.0). Update BGM yang sedang berjalan. */
+    public static void setVolume(float vol) {
+        volume = Math.max(0f, Math.min(1f, vol));
+        if (bgmClip != null && bgmClip.isOpen()) {
+            setClipVolume(bgmClip, volume);
+        }
+    }
+
+    public static boolean isMuted()         { return muted;  }
+    public static float   getVolume()       { return volume; }
+    public static String  getCurrentBgm()   { return currentBgmName; }
+
+    // ============================================================
+    // PRIVATE HELPERS
+    // ============================================================
+
+    /**
+     * Memulai pemutaran BGM secara internal tanpa mengubah currentBgmName.
+     * Dipanggil oleh playBGM() dan toggleMute().
+     */
+    private static void startBgmPlayback(String soundName) {
         if (muted) return;
         String path = SOUND_PATHS.get(soundName);
         if (path == null) {
-            // Fallback ke generic battle BGM
             path = SOUND_PATHS.get(BGM_MAIN);
             if (path == null) return;
         }
@@ -132,50 +168,13 @@ public class SoundManager {
         } catch (UnsupportedAudioFileException | IOException | LineUnavailableException ignored) {}
     }
 
-    /** Hentikan music latar. */
-    public static void stopBGM() {
-        if (bgmClip != null) {
-            if (bgmClip.isRunning()) bgmClip.stop();
-            bgmClip.close();
-        }
-        bgmClip = null;
-    }
-
-    /** Toggle mute semua suara. */
-    public static void toggleMute() {
-        muted = !muted;
-        if (muted) {
-            stopBGM();
-        }
-    }
-
-    /**
-     * Set volume global (0.0 – 1.0).
-     * Berlaku untuk BGM yang diputar setelah ini.
-     */
-    public static void setVolume(float vol) {
-        volume = Math.max(0f, Math.min(1f, vol));
-        // Update volume BGM yang sedang berjalan
-        if (bgmClip != null && bgmClip.isOpen()) {
-            setClipVolume(bgmClip, volume);
-        }
-    }
-
-    public static boolean isMuted()  { return muted; }
-    public static float   getVolume(){ return volume; }
-
-    // ============================================================
-    // PRIVATE HELPERS
-    // ============================================================
     private static void setClipVolume(Clip clip, float vol) {
         try {
             FloatControl fc = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
-            float min = fc.getMinimum(); // biasanya -80 dB
-            float max = fc.getMaximum(); // biasanya 6 dB
+            float min  = fc.getMinimum();
+            float max  = fc.getMaximum();
             float gain = (vol <= 0f) ? min : (float)(20.0 * Math.log10(vol));
             fc.setValue(Math.max(min, Math.min(max, gain)));
-        } catch (IllegalArgumentException | UnsupportedOperationException ignored) {
-            // Kontrol volume tidak didukung perangkat — skip saja
-        }
+        } catch (IllegalArgumentException | UnsupportedOperationException ignored) {}
     }
 }

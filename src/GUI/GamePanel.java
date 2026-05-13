@@ -1,6 +1,6 @@
 package GUI;
 
-import CharacterSettings.*;
+import CharacterSettings.Player;
 import CharacterSettings.Character;
 import CharacterSettings.Zombie;
 import CharacterSettings.Zomboss;
@@ -12,78 +12,70 @@ import java.awt.geom.*;
 import java.util.ArrayList;
 
 /**
- * GamePanel v4 — Panel utama game.
+ * GamePanel v5 — Panel utama game.
  *
- * PERBAIKAN v4:
- *  [1] BUG FIX #5: Focus keyboard (A/D/P) — requestFocusInWindow() konsisten
- *  [2] Custom image size: gambar player/enemy pakai AssetConfig.PLAYER_RENDER_W/H
- *  [3] Unesa map opacity: drawMapOverlay menggunakan AssetConfig.getMapBgDimAlpha
- *  [4] Database: simpan hasil game saat win/game over
- *  [5] Wave progress bar di HUD
- *
- * PERBAIKAN BUG (Revisi):
- *  [FIX-1] Import CharacterSettings.Character, Zombie, Zomboss ditambahkan
- *  [FIX-2] addOverlayMouseListener() — listener disimpan sebagai field, hapus lama sebelum tambah baru
- *  [FIX-3] stopAllEffectTimers() — ditambahkan proximityTimer agar tidak bocor saat game over
- *  [FIX-4] drawScene() — guard dimensi (W==0||H==0) agar tidak crash saat panel belum siap
- *  [FIX-5] enemyTurn() — tambah guard anim.isFrozen() agar tidak double damage saat freeze
+ * PERUBAHAN v5:
+ *  [1] checkPlayerDeath() — Last Chance sekarang memicu animasi revival dari AnimationEngine.
+ *      Semua aktivitas (attack, heal, zombie timer, proximity) dibekukan selama revival.
+ *  [2] saveProgress(won=true) sekarang memicu StoryScreen jika story belum ditampilkan.
+ *  [3] Zombie attack state CHARGING tidak lagi menggambar fillRect (sudah dihapus di AnimationEngine v6).
+ *  [4] Guard isReviving() ditambahkan di playerAction() dan enemyTurn().
  */
 public class GamePanel extends JPanel {
 
-    // ---- Data game ----
-    private Player player;
-    private Character currentEnemy;          // FIX-1: pakai import eksplisit
-    private int wave = 1;
+    // ── Data game ──────────────────────────────────────────────────────
+    private Player    player;
+    private Character currentEnemy;
+    private int       wave = 1;
     private ArrayList<String> listBuff;
 
-    // ---- Pilihan dari PreGame ----
+    // ── Pilihan dari PreGame ───────────────────────────────────────────
     private String selectedMap;
     private String selectedChar;
 
-    // ---- Komponen GUI ----
+    // ── Komponen GUI ──────────────────────────────────────────────────
     private JTextArea battleLog;
     private JButton   btnAttack, btnHeal;
     private JPanel    actionPanel, visualPanel;
 
-    // ---- Assets ----
-    private Image imgPlayer, imgBackground;
+    // ── Assets ────────────────────────────────────────────────────────
+    private Image        imgPlayer, imgBackground;
     private final Image[] imgZombies = new Image[10];
-    private Image imgZomboss;
+    private Image        imgZomboss;
 
-    // ---- Mesin animasi ----
+    // ── Mesin animasi ─────────────────────────────────────────────────
     private AnimationEngine anim;
 
-    // ---- Timer efek map ----
+    // ── Timer efek map ────────────────────────────────────────────────
     private Timer zombosMapDotTimer;
     private Timer frozenTimer;
     private Timer zombieAdvanceTimer;
 
-    // ---- State layar ----
+    // ── State layar ───────────────────────────────────────────────────
     private boolean gameOver     = false;
     private boolean victory      = false;
     private int     overlayFrame = 0;
     private Timer   overlayTimer;
-
-    // FIX-2: simpan overlay listener agar bisa dihapus sebelum tambah baru
     private MouseAdapter overlayListener;
 
-    // ---- Proximity ----
+    // ── Proximity ─────────────────────────────────────────────────────
     private int   proximityThreshold = 70;
     private Timer proximityTimer;
 
-    // ---- Stat zombie ----
+    // ── Stat zombie ───────────────────────────────────────────────────
     private int baseEnemyDamage = 0;
     private int enemyMaxHpCache = 0;
 
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+
     public GamePanel(String playerName, String selectedMap, String selectedChar) {
         this.selectedMap  = selectedMap;
         this.selectedChar = selectedChar;
         this.setLayout(new BorderLayout());
 
-        // 1. BattleLog
+        // BattleLog
         battleLog = new JTextArea();
         battleLog.setEditable(false);
         battleLog.setFont(new Font("Monospaced", Font.PLAIN, 13));
@@ -94,13 +86,12 @@ public class GamePanel extends JPanel {
         scrollLog.setPreferredSize(new Dimension(800, 120));
         scrollLog.setBorder(BorderFactory.createLineBorder(new Color(60, 80, 60), 1));
 
-        // 2. Init player
         initPlayer(playerName);
         initBuffs();
         spawnEnemyForWave(1);
         loadAssets();
 
-        // 3. Visual canvas
+        // Visual canvas
         visualPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -110,22 +101,19 @@ public class GamePanel extends JPanel {
         };
         visualPanel.setPreferredSize(new Dimension(800, 420));
         visualPanel.setBackground(Color.BLACK);
-
-        // Focus policy
         visualPanel.setFocusable(true);
         visualPanel.setRequestFocusEnabled(true);
 
-        // 4. AnimationEngine
+        // AnimationEngine
         anim = new AnimationEngine(visualPanel);
         anim.setMovementEnabled(true);
         anim.setIsZomboss(false);
 
-        // 5. Tombol
+        // Tombol
         btnAttack = createVisualButton("⚔ SERANG", "ATK: " + player.getDamage(),
-                                       new Color(180,40,40), new Color(220,80,60));
+                new Color(180,40,40), new Color(220,80,60));
         btnHeal   = createVisualButton("💚 HEAL", "Sisa: " + player.getHealLimit(),
-                                       new Color(30,120,50), new Color(60,180,80));
-
+                new Color(30,120,50), new Color(60,180,80));
         anim.registerButtons(btnAttack, btnHeal);
 
         btnAttack.addActionListener(e -> {
@@ -137,7 +125,7 @@ public class GamePanel extends JPanel {
             SwingUtilities.invokeLater(() -> visualPanel.requestFocusInWindow());
         });
 
-        // 6. Panel tombol
+        // Panel tombol
         JButton btnMute = createMuteButton();
         actionPanel = new JPanel() {
             @Override
@@ -159,7 +147,6 @@ public class GamePanel extends JPanel {
         this.add(visualPanel, BorderLayout.CENTER);
         this.add(bottomPanel, BorderLayout.SOUTH);
 
-        // Klik mana saja → kembalikan focus ke visualPanel
         MouseAdapter focusGrabber = new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 visualPanel.requestFocusInWindow();
@@ -168,15 +155,13 @@ public class GamePanel extends JPanel {
         this.addMouseListener(focusGrabber);
         visualPanel.addMouseListener(focusGrabber);
 
-        // 7. Proximity
         proximityThreshold = AssetConfig.getProximityThreshold(selectedMap);
         proximityTimer = new Timer(800, e -> checkProximityDanger());
         proximityTimer.start();
 
-        // 8. Mulai
         log("=== LAST CHANCE FOR LIFE ===");
         log("Karakter: " + AssetConfig.getCharacterName(selectedChar)
-            + " | Map: " + AssetConfig.getMapName(selectedMap));
+                + " | Map: " + AssetConfig.getMapName(selectedMap));
         logCharacterAbility();
         logMapEffect();
         startWave(1, true);
@@ -187,14 +172,13 @@ public class GamePanel extends JPanel {
         });
     }
 
-    // ====================================================================
-    // INISIALISASI PLAYER
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+    // INIT PLAYER
+    // ════════════════════════════════════════════════════════════════════
+
     private void initPlayer(String playerName) {
         int[] stats = AssetConfig.getCharacterBaseStats(selectedChar);
-        int maxHp = stats[0];
-        int atk   = stats[1];
-        int heal  = stats[2];
+        int maxHp = stats[0], atk = stats[1], heal = stats[2];
 
         if ("KNIGHT_PRINCE".equals(selectedChar)) atk = (int)(atk * 1.05f);
         float atkMult = AssetConfig.getPlayerAtkMultiplier(selectedMap, selectedChar);
@@ -202,7 +186,6 @@ public class GamePanel extends JPanel {
 
         player = new Player(playerName, maxHp, atk);
         player.setHealLimit(heal);
-
         if ("RAYMOND".equals(selectedChar)) player.addInvisible(30);
     }
 
@@ -216,9 +199,10 @@ public class GamePanel extends JPanel {
         log("[🗺 Map Effect] " + AssetConfig.getMapName(selectedMap) + ": " + desc[0]);
     }
 
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
     // TOMBOL
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+
     private JButton createVisualButton(String mainText, String subText,
                                        Color colorFrom, Color colorTo) {
         JButton btn = new JButton() {
@@ -255,10 +239,8 @@ public class GamePanel extends JPanel {
             }
             @Override public Dimension getPreferredSize(){return new Dimension(200,50);}
         };
-        btn.setContentAreaFilled(false);
-        btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
-        btn.setFocusable(false);
+        btn.setContentAreaFilled(false); btn.setBorderPainted(false);
+        btn.setFocusPainted(false);      btn.setFocusable(false);
         btn.putClientProperty("subText", subText);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
@@ -287,10 +269,8 @@ public class GamePanel extends JPanel {
             }
             @Override public Dimension getPreferredSize(){return new Dimension(50,50);}
         };
-        btn.setContentAreaFilled(false);
-        btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
-        btn.setFocusable(false);
+        btn.setContentAreaFilled(false); btn.setBorderPainted(false);
+        btn.setFocusPainted(false);      btn.setFocusable(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.addActionListener(e -> {
             SoundManager.toggleMute();
@@ -306,9 +286,10 @@ public class GamePanel extends JPanel {
         btn.repaint();
     }
 
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
     // ASSETS
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+
     private void loadAssets() {
         imgPlayer  = loadImage(AssetConfig.getCharacterPath(selectedChar));
         imgZomboss = loadImage(AssetConfig.ZOMBOSS);
@@ -331,11 +312,11 @@ public class GamePanel extends JPanel {
         return imgZombies[Math.min(wave-1, 8)];
     }
 
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
     // DRAW SCENE
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+
     private void drawScene(Graphics2D g2) {
-        // FIX-4: Guard dimensi — keluar jika panel belum siap
         int W = visualPanel.getWidth();
         int H = visualPanel.getHeight();
         if (W == 0 || H == 0) return;
@@ -346,20 +327,15 @@ public class GamePanel extends JPanel {
         int sx = anim.getShakeOffsetX(), sy = anim.getShakeOffsetY();
         g2.translate(sx, sy);
 
-        // Background
         if (imgBackground != null) g2.drawImage(imgBackground, 0, 0, W, H, this);
         else drawFallbackBg(g2, W, H);
 
-        // Map overlay dengan opacity per-map
         drawMapOverlay(g2, W, H);
 
         // Player
-        int px  = anim.getPlayerRenderX();
-        int py  = anim.getPlayerY();
-        int prW = AssetConfig.PLAYER_RENDER_W;
-        int prH = AssetConfig.PLAYER_RENDER_H;
-        if (imgPlayer != null)
-            g2.drawImage(imgPlayer, px, py, prW, prH, this);
+        int px  = anim.getPlayerRenderX(), py = anim.getPlayerY();
+        int prW = AssetConfig.PLAYER_RENDER_W, prH = AssetConfig.PLAYER_RENDER_H;
+        if (imgPlayer != null) g2.drawImage(imgPlayer, px, py, prW, prH, this);
         else {
             g2.setColor(new Color(60,100,200));
             g2.fillRoundRect(px+30, py, 140, prH, 20, 20);
@@ -368,37 +344,25 @@ public class GamePanel extends JPanel {
         // Enemy
         int ex  = anim.getEnemyRenderX();
         int ey  = anim.getEnemyRenderY() + AssetConfig.ENEMY_RENDER_OFFSET_Y;
-        int erW = AssetConfig.ENEMY_RENDER_W;
-        int erH = AssetConfig.ENEMY_RENDER_H;
+        int erW = AssetConfig.ENEMY_RENDER_W, erH = AssetConfig.ENEMY_RENDER_H;
         Image enemyImg = getEnemyImage();
         if (enemyImg != null) {
-            if ("UNESA".equals(selectedMap)) {
-                drawEnemyWithContrast(g2, enemyImg, ex, ey, erW, erH);
-            } else {
-                g2.drawImage(enemyImg, ex, ey, erW, erH, this);
-            }
+            if ("UNESA".equals(selectedMap)) drawEnemyWithContrast(g2, enemyImg, ex, ey, erW, erH);
+            else g2.drawImage(enemyImg, ex, ey, erW, erH, this);
         } else {
-            Color ec = (wave==10)?new Color(180,0,180):new Color(180,40,40);
-            g2.setColor(ec);
+            g2.setColor((wave==10)?new Color(180,0,180):new Color(180,40,40));
             g2.fillRoundRect(ex+10, ey, erW-20, erH, 20, 20);
         }
 
-        // Efek animasi
         anim.drawEffects(g2);
 
-        // HP bar — posisi logis (tidak bergerak saat animasi)
-        int logicalPx = anim.getPlayerX();
-        int logicalEx = anim.getEnemyCurrentX();
-
-        drawHpBar(g2, logicalPx, anim.getPlayerY()-28,
-                  prW, player.getHp(), player.getMaxHp(), player.getName());
+        int logicalPx = anim.getPlayerX(), logicalEx = anim.getEnemyCurrentX();
+        drawHpBar(g2, logicalPx, anim.getPlayerY()-28, prW,
+                player.getHp(), player.getMaxHp(), player.getName());
         drawHpBar(g2, logicalEx, AnimationEngine.ENEMY_BASE_Y-28,
-                  erW, currentEnemy.getHp(), enemyMaxHpCache, currentEnemy.getName());
+                erW, currentEnemy.getHp(), enemyMaxHpCache, currentEnemy.getName());
 
-        // Proximity warning
         drawProximityWarning(g2, logicalPx, logicalEx);
-
-        // HUD
         drawHUD(g2, W, H);
 
         if (gameOver) drawGameOverOverlay(g2, W, H);
@@ -409,38 +373,20 @@ public class GamePanel extends JPanel {
 
     private void drawEnemyWithContrast(Graphics2D g2, Image img, int x, int y, int w, int h) {
         g2.setColor(new Color(0, 0, 0, 90));
-        g2.fillRoundRect(x + 4, y + 6, w, h, 12, 12);
+        g2.fillRoundRect(x+4, y+6, w, h, 12, 12);
         g2.drawImage(img, x, y, w, h, this);
     }
 
     private void drawMapOverlay(Graphics2D g2, int W, int H) {
         int dimAlpha = AssetConfig.getMapBgDimAlpha(selectedMap);
-        if (dimAlpha > 0) {
-            g2.setColor(new Color(0, 0, 0, dimAlpha));
-            g2.fillRect(0, 0, W, H);
-        }
-
+        if (dimAlpha > 0) { g2.setColor(new Color(0,0,0,dimAlpha)); g2.fillRect(0,0,W,H); }
         java.awt.Color tint = AssetConfig.getMapBgTint(selectedMap);
-        if (tint != null) {
-            g2.setColor(tint);
-            g2.fillRect(0, 0, W, H);
-        }
-
-        if ("ZOMBOSS_MAP".equals(selectedMap)) {
-            g2.setColor(new Color(80,0,0,40));
-            g2.fillRect(0,0,W,H);
-        }
-        if ("FROZEN".equals(selectedMap)) {
-            g2.setColor(new Color(0,50,120,25));
-            g2.fillRect(0,0,W,H);
-        }
-        if ("MOUNTAIN".equals(selectedMap)) {
-            g2.setColor(new Color(100,40,0,20));
-            g2.fillRect(0,0,W,H);
-        }
+        if (tint != null) { g2.setColor(tint); g2.fillRect(0,0,W,H); }
+        if ("ZOMBOSS_MAP".equals(selectedMap)) { g2.setColor(new Color(80,0,0,40)); g2.fillRect(0,0,W,H); }
+        if ("FROZEN".equals(selectedMap))      { g2.setColor(new Color(0,50,120,25)); g2.fillRect(0,0,W,H); }
+        if ("MOUNTAIN".equals(selectedMap))    { g2.setColor(new Color(100,40,0,20)); g2.fillRect(0,0,W,H); }
         if (wave==10 && !"ZOMBOSS_MAP".equals(selectedMap)) {
-            g2.setColor(new Color(80,0,0,35));
-            g2.fillRect(0,0,W,H);
+            g2.setColor(new Color(80,0,0,35)); g2.fillRect(0,0,W,H);
         }
     }
 
@@ -452,54 +398,52 @@ public class GamePanel extends JPanel {
     private void drawProximityWarning(Graphics2D g2, int px, int ex) {
         int dist = ex - (px + AssetConfig.PLAYER_RENDER_W);
         if (dist < proximityThreshold && dist > -10 && !gameOver && !victory) {
-            float alpha=0.4f+(float)Math.sin(System.currentTimeMillis()/200.0)*0.3f;
-            alpha=Math.max(0.1f,Math.min(alpha,0.7f));
+            float alpha = 0.4f + (float)Math.sin(System.currentTimeMillis()/200.0)*0.3f;
+            alpha = Math.max(0.1f, Math.min(alpha, 0.7f));
             g2.setColor(new Color(1f,0.1f,0.1f,alpha));
             g2.setStroke(new BasicStroke(3f));
-            g2.drawLine(px+AssetConfig.PLAYER_RENDER_W,0,px+AssetConfig.PLAYER_RENDER_W,visualPanel.getHeight());
+            g2.drawLine(px+AssetConfig.PLAYER_RENDER_W, 0,
+                        px+AssetConfig.PLAYER_RENDER_W, visualPanel.getHeight());
             g2.setFont(new Font("Arial",Font.BOLD,11));
             g2.setColor(new Color(255,80,80,(int)(alpha*255)));
-            g2.drawString("⚠ BAHAYA!",px+AssetConfig.PLAYER_RENDER_W/2,AnimationEngine.PLAYER_BASE_Y-40);
+            g2.drawString("⚠ BAHAYA!", px+AssetConfig.PLAYER_RENDER_W/2,
+                          AnimationEngine.PLAYER_BASE_Y-40);
         }
     }
 
     private void drawHpBar(Graphics2D g2, int x, int y, int bw, int cur, int max, String name) {
-        int safe=Math.max(cur,0);
-        float pct=(float)safe/Math.max(max,1);
-        int filled=(int)(pct*bw);
-
+        int safe = Math.max(cur,0);
+        float pct = (float)safe/Math.max(max,1);
+        int filled = (int)(pct*bw);
         g2.setColor(new Color(30,30,30,210));
         g2.fillRoundRect(x,y,bw,15,8,8);
-
-        Color barColor=pct>0.6f?new Color(60,200,60):pct>0.3f?new Color(230,200,40):new Color(220,50,50);
+        Color barColor = pct>0.6f?new Color(60,200,60):pct>0.3f?new Color(230,200,40):new Color(220,50,50);
         if (filled>0) {
             g2.setPaint(new GradientPaint(x,y,barColor.brighter(),x,y+15,barColor.darker()));
             g2.fillRoundRect(x,y,filled,15,8,8);
         }
-        g2.setColor(new Color(180,180,180,100));
-        g2.setStroke(new BasicStroke(1.2f));
+        g2.setColor(new Color(180,180,180,100)); g2.setStroke(new BasicStroke(1.2f));
         g2.drawRoundRect(x,y,bw,15,8,8);
-
-        String hpText=name+"  "+safe+"/"+max;
+        String hpText = name+"  "+safe+"/"+max;
         g2.setFont(new Font("Arial",Font.BOLD,11));
         g2.setColor(new Color(0,0,0,160)); g2.drawString(hpText,x+6,y+11);
-        g2.setColor(Color.WHITE);          g2.drawString(hpText,x+5,y+10);
+        g2.setColor(Color.WHITE);           g2.drawString(hpText,x+5,y+10);
     }
 
     private void drawHUD(Graphics2D g2, int W, int H) {
-        String waveText=(wave==10)?"── ⚠ ZOMBOSS ⚠ ──":"── WAVE "+wave+" / 10 ──";
-        Color waveColor=(wave==10)?new Color(220,80,220):new Color(255,215,0);
+        String waveText = (wave==10)?"── ⚠ ZOMBOSS ⚠ ──":"── WAVE "+wave+" / 10 ──";
+        Color  waveColor = (wave==10)?new Color(220,80,220):new Color(255,215,0);
         g2.setFont(new Font("Serif",Font.BOLD,20));
-        FontMetrics fm=g2.getFontMetrics();
-        int wx=(W-fm.stringWidth(waveText))/2;
+        FontMetrics fm = g2.getFontMetrics();
+        int wx = (W-fm.stringWidth(waveText))/2;
         g2.setColor(new Color(0,0,0,160)); g2.drawString(waveText,wx+2,32);
-        g2.setColor(waveColor);            g2.drawString(waveText,wx,30);
+        g2.setColor(waveColor);             g2.drawString(waveText,wx,30);
 
         drawWaveProgressBar(g2, W);
 
         g2.setFont(new Font("Arial",Font.PLAIN,12));
         g2.setColor(new Color(120,220,255));
-        g2.drawString("ATK: "+player.getDamage(),82,
+        g2.drawString("ATK: "+player.getDamage(), 82,
                       AnimationEngine.PLAYER_BASE_Y+AssetConfig.PLAYER_RENDER_H+17);
 
         drawMapEffectHUD(g2, W);
@@ -509,7 +453,7 @@ public class GamePanel extends JPanel {
         g2.drawString("[A/D: gerak | P: pause | Dekati zombie = danger!]",W/2-140,H-8);
 
         anim.drawStatusHUD(g2, player.hasLastChance(), player.isLifesteal(),
-            player.getInvisibleChance(), player.getHealLimit(), H, selectedChar, selectedMap);
+                player.getInvisibleChance(), player.getHealLimit(), H, selectedChar, selectedMap);
 
         if (!anim.hasMoved()) {
             g2.setFont(new Font("Arial",Font.BOLD,12));
@@ -521,21 +465,15 @@ public class GamePanel extends JPanel {
     }
 
     private void drawWaveProgressBar(Graphics2D g2, int W) {
-        int barW = 200, barH = 8;
-        int barX = (W - barW) / 2;
-        int barY = 38;
-        float pct = (float) wave / 10f;
-
+        int barW=200, barH=8, barX=(W-barW)/2, barY=38;
+        float pct = (float)wave/10f;
         g2.setColor(new Color(30,30,30,180));
-        g2.fillRoundRect(barX, barY, barW, barH, 4, 4);
-
-        Color barColor = (wave == 10) ? new Color(220,80,220) : new Color(255,215,0);
-        g2.setPaint(new GradientPaint(barX, barY, barColor, barX, barY+barH, barColor.darker()));
-        g2.fillRoundRect(barX, barY, (int)(barW * pct), barH, 4, 4);
-
-        g2.setColor(new Color(180,180,180,80));
-        g2.setStroke(new BasicStroke(1f));
-        g2.drawRoundRect(barX, barY, barW, barH, 4, 4);
+        g2.fillRoundRect(barX,barY,barW,barH,4,4);
+        Color barColor = (wave==10)?new Color(220,80,220):new Color(255,215,0);
+        g2.setPaint(new GradientPaint(barX,barY,barColor,barX,barY+barH,barColor.darker()));
+        g2.fillRoundRect(barX,barY,(int)(barW*pct),barH,4,4);
+        g2.setColor(new Color(180,180,180,80)); g2.setStroke(new BasicStroke(1f));
+        g2.drawRoundRect(barX,barY,barW,barH,4,4);
     }
 
     private void drawMapEffectHUD(Graphics2D g2, int W) {
@@ -568,16 +506,16 @@ public class GamePanel extends JPanel {
         }
     }
 
-    // ====================================================================
-    // GAME OVER / VICTORY
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+    // GAME OVER / VICTORY OVERLAY
+    // ════════════════════════════════════════════════════════════════════
+
     private void drawGameOverOverlay(Graphics2D g2, int W, int H) {
-        float fade=Math.min(overlayFrame/40f,1f);
+        float fade = Math.min(overlayFrame/40f,1f);
         g2.setColor(new Color(0,0,0,(int)(200*fade)));
         g2.fillRect(0,0,W,H);
-        if (overlayFrame<20) return;
-
-        float textFade=Math.min((overlayFrame-20)/30f,1f);
+        if (overlayFrame < 20) return;
+        float textFade = Math.min((overlayFrame-20)/30f,1f);
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,textFade));
         g2.setFont(new Font("Serif",Font.BOLD,76));
         FontMetrics fm=g2.getFontMetrics();
@@ -585,8 +523,7 @@ public class GamePanel extends JPanel {
         int tx=(W-fm.stringWidth(goText))/2;
         g2.setColor(new Color(0,0,0,200)); g2.drawString(goText,tx+4,H/2-36);
         g2.setColor(new Color(220,40,40));  g2.drawString(goText,tx,H/2-40);
-
-        if (overlayFrame>50) {
+        if (overlayFrame > 50) {
             float btnFade=Math.min((overlayFrame-50)/25f,1f);
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,btnFade));
             g2.setFont(new Font("Arial",Font.PLAIN,16));
@@ -595,18 +532,17 @@ public class GamePanel extends JPanel {
             FontMetrics fm2=g2.getFontMetrics();
             g2.drawString(sub,(W-fm2.stringWidth(sub))/2,H/2+10);
             drawOverlayButton(g2,W/2-130,H/2+45,120,38,"🔄 Ulang",new Color(50,130,50),"RETRY");
-            drawOverlayButton(g2,W/2+10,H/2+45,120,38,"🚪 Keluar",new Color(130,50,50),"QUIT");
+            drawOverlayButton(g2,W/2+10, H/2+45,120,38,"🚪 Keluar",new Color(130,50,50),"QUIT");
         }
         g2.setComposite(AlphaComposite.SrcOver);
     }
 
     private void drawVictoryOverlay(Graphics2D g2, int W, int H) {
-        float fade=Math.min(overlayFrame/40f,1f);
+        float fade = Math.min(overlayFrame/40f,1f);
         g2.setColor(new Color(0,30,0,(int)(200*fade)));
         g2.fillRect(0,0,W,H);
-        if (overlayFrame<20) return;
-
-        float textFade=Math.min((overlayFrame-20)/30f,1f);
+        if (overlayFrame < 20) return;
+        float textFade = Math.min((overlayFrame-20)/30f,1f);
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,textFade));
         g2.setFont(new Font("Serif",Font.BOLD,58));
         FontMetrics fm=g2.getFontMetrics();
@@ -614,17 +550,17 @@ public class GamePanel extends JPanel {
         int tx=(W-fm.stringWidth(vText))/2;
         g2.setColor(new Color(0,0,0,180)); g2.drawString(vText,tx+3,H/2-35);
         g2.setColor(new Color(255,215,0)); g2.drawString(vText,tx,H/2-38);
-
-        if (overlayFrame>50) {
+        if (overlayFrame > 50) {
             float btnFade=Math.min((overlayFrame-50)/25f,1f);
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,btnFade));
             drawOverlayButton(g2,W/2-130,H/2+40,120,38,"🔄 Main Lagi",new Color(50,100,180),"RETRY");
-            drawOverlayButton(g2,W/2+10,H/2+40,120,38,"🚪 Keluar",new Color(100,60,30),"QUIT");
+            drawOverlayButton(g2,W/2+10, H/2+40,120,38,"🚪 Keluar",new Color(100,60,30),"QUIT");
         }
         g2.setComposite(AlphaComposite.SrcOver);
     }
 
-    private void drawOverlayButton(Graphics2D g2,int x,int y,int w,int h,String label,Color col,String key){
+    private void drawOverlayButton(Graphics2D g2,int x,int y,int w,int h,
+                                   String label,Color col,String key) {
         g2.setPaint(new GradientPaint(x,y,col.brighter(),x,y+h,col.darker()));
         g2.fillRoundRect(x,y,w,h,10,10);
         g2.setColor(new Color(255,255,255,120)); g2.setStroke(new BasicStroke(1.5f));
@@ -634,11 +570,8 @@ public class GamePanel extends JPanel {
         g2.drawString(label,(x+(w-fm.stringWidth(label))/2),(y+h/2+fm.getAscent()/2-2));
     }
 
-    // FIX-2: Simpan listener sebagai field, hapus yang lama sebelum tambah baru
     private void addOverlayMouseListener() {
-        if (overlayListener != null) {
-            visualPanel.removeMouseListener(overlayListener);
-        }
+        if (overlayListener != null) visualPanel.removeMouseListener(overlayListener);
         overlayListener = new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -646,8 +579,8 @@ public class GamePanel extends JPanel {
                 int W=visualPanel.getWidth(), H=visualPanel.getHeight();
                 Rectangle retryRect=new Rectangle(W/2-130,H/2+40,120,38);
                 Rectangle quitRect =new Rectangle(W/2+10, H/2+40,120,38);
-                if (retryRect.contains(e.getPoint())) restartGame();
-                else if (quitRect.contains(e.getPoint())) System.exit(0);
+                if      (retryRect.contains(e.getPoint())) restartGame();
+                else if (quitRect .contains(e.getPoint())) System.exit(0);
             }
         };
         visualPanel.addMouseListener(overlayListener);
@@ -656,7 +589,7 @@ public class GamePanel extends JPanel {
     private void restartGame() {
         stopAllTimers();
         SoundManager.stopBGM();
-        Window win=SwingUtilities.getWindowAncestor(this);
+        Window win = SwingUtilities.getWindowAncestor(this);
         win.dispose();
         SwingUtilities.invokeLater(() -> {
             SessionManager.getInstance().refreshProgress();
@@ -665,103 +598,106 @@ public class GamePanel extends JPanel {
     }
 
     private void stopAllTimers() {
-        if (overlayTimer      != null) overlayTimer.stop();
-        if (zombosMapDotTimer != null) zombosMapDotTimer.stop();
-        if (frozenTimer       != null) frozenTimer.stop();
-        if (zombieAdvanceTimer!= null) zombieAdvanceTimer.stop();
-        if (proximityTimer    != null) proximityTimer.stop();
-        if (anim              != null) anim.stopTimer();
+        if (overlayTimer       != null) overlayTimer.stop();
+        if (zombosMapDotTimer  != null) zombosMapDotTimer.stop();
+        if (frozenTimer        != null) frozenTimer.stop();
+        if (zombieAdvanceTimer != null) zombieAdvanceTimer.stop();
+        if (proximityTimer     != null) proximityTimer.stop();
+        if (anim               != null) anim.stopTimer();
     }
 
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
     // PROXIMITY DANGER
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+
     private void checkProximityDanger() {
-        if (gameOver||victory||anim.isPaused()) return;
+        if (gameOver||victory||anim.isPaused()||anim.isReviving()) return;
         if (player.getHp()<=0||currentEnemy.getHp()<=0) return;
         if (anim.isInEntrance()) return;
 
-        int dist=anim.getPlayerEnemyDistance();
-        if (dist<proximityThreshold && dist>-20) {
-            int dmg=Math.max(1, currentEnemy.getDamage()/3);
-            if (Math.random()<0.45) {
+        int dist = anim.getPlayerEnemyDistance();
+        if (dist < proximityThreshold && dist > -20) {
+            int dmg = Math.max(1, currentEnemy.getDamage()/3);
+            if (Math.random() < 0.45) {
                 anim.playZombieAttack();
-                applyDamageToPlayer(dmg,"[Proximity] Terlalu dekat! "+
-                    currentEnemy.getName()+" menyerang! -"+dmg+" HP");
+                applyDamageToPlayer(dmg, "[Proximity] Terlalu dekat! "+
+                        currentEnemy.getName()+" menyerang! -"+dmg+" HP");
             }
         }
     }
 
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
     // LOGIKA GILIRAN
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+
     private void playerAction(int actionType) {
         if (gameOver||victory) return;
         if (player.getHp()<=0||currentEnemy.getHp()<=0) return;
         if (anim.isInEntrance()||anim.isPaused()) return;
-        if (anim.isFrozen()) { log("[❄] Kamu sedang beku! Tidak bisa bertindak!"); return; }
+        // [v5] Guard revival
+        if (anim.isReviving()) { log("[✦] Menunggu kebangkitan..."); return; }
+        if (anim.isFrozen())   { log("[❄] Kamu sedang beku!"); return; }
 
-        if (actionType==1) {
+        if (actionType == 1) {
             if (anim.isAttacking()) return;
-            final int dmg=player.getDamage();
+            final int dmg = player.getDamage();
             anim.playAttack(() -> {
                 player.attack(currentEnemy);
                 anim.playEnemyHit(dmg);
                 log("Kamu menyerang "+currentEnemy.getName()+" sebesar "+dmg+" damage!");
 
                 if (player.isLifesteal()) {
-                    int steal=Math.max(1,(int)(player.getMaxHp()*0.10f));
+                    int steal = Math.max(1,(int)(player.getMaxHp()*0.10f));
                     player.setHp(Math.min(player.getHp()+steal, player.getMaxHp()));
                     anim.playHeal(steal);
-                    log("[Lifesteal] Menyerap "+steal+" HP (10% MaxHP)!");
+                    log("[Lifesteal] Menyerap "+steal+" HP!");
                 }
                 if ("XAVIER".equals(selectedChar)) {
-                    int drain=Math.max(1,(int)(dmg*0.10f));
+                    int drain = Math.max(1,(int)(dmg*0.10f));
                     player.setHp(Math.min(player.getHp()+drain, player.getMaxHp()));
                     anim.playVampiricDrain(drain);
                     log("[Xavier] Vampiric drain +"+drain+" HP!");
                 }
 
-                if (currentEnemy.getHp()<=0) {
+                if (currentEnemy.getHp() <= 0) {
                     log(currentEnemy.getName()+" TELAH DIKALAHKAN!");
                     anim.playWaveClear(wave);
                     stopZombieAdvance();
-                    anim.playDeath(false,() -> {
-                        Timer t=new Timer(400,ev->nextWave());
+                    anim.playDeath(false, () -> {
+                        Timer t = new Timer(400, ev -> nextWave());
                         t.setRepeats(false); t.start();
                     });
                     return;
                 }
-                Timer te=new Timer(320,ev->enemyTurn());
+                Timer te = new Timer(320, ev -> enemyTurn());
                 te.setRepeats(false); te.start();
             });
-
         } else {
-            if (player.getHealLimit()<=0) { log("Heal sudah habis!"); return; }
-            int hpBefore=player.getHp();
+            if (player.getHealLimit() <= 0) { log("Heal sudah habis!"); return; }
+            int hpBefore = player.getHp();
             player.heal();
-            int gained=player.getHp()-hpBefore;
-            if (gained>0) {
+            int gained = player.getHp() - hpBefore;
+            if (gained > 0) {
                 anim.playHeal(gained);
                 log("Healing! (+"+gained+" HP)  HP: "+player.getHp()+"/"+player.getMaxHp());
             }
-            updateButtonSub(btnHeal,"Sisa: "+player.getHealLimit());
-            if (player.getHealLimit()<=0) btnHeal.setEnabled(false);
+            updateButtonSub(btnHeal, "Sisa: "+player.getHealLimit());
+            if (player.getHealLimit() <= 0) btnHeal.setEnabled(false);
         }
     }
 
     private void enemyTurn() {
-        // FIX-5: Jangan serang jika player sedang freeze
-        if (anim.isFrozen()) return;
+        // [v5] Guard revival
+        if (anim.isFrozen()||anim.isReviving()) return;
         if (currentEnemy.getHp()<=0||player.getHp()<=0) return;
         anim.playZombieAttack();
         if (player.tryDodge()) {
             anim.playMiss();
-            log(currentEnemy.getName()+" menyerang... tapi MELESET! (Dodge)");
+            log(currentEnemy.getName()+" menyerang... MELESET! (Dodge)");
             return;
         }
-        int dmg=getEnemyEffectiveDamage();
-        player.setHp(Math.max(0,player.getHp()-dmg));
+        int dmg = getEnemyEffectiveDamage();
+        player.setHp(Math.max(0, player.getHp()-dmg));
         anim.playPlayerHit(dmg);
         log(currentEnemy.getName()+" menyerang balik! -"+dmg+" HP");
         if (wave==10) anim.playScreenShake(8);
@@ -769,33 +705,49 @@ public class GamePanel extends JPanel {
     }
 
     private int getEnemyEffectiveDamage() {
-        float mult=AssetConfig.getZombieAtkMultiplier(selectedMap, wave);
-        if (wave==10) mult=Math.max(mult,1.5f);
-        return Math.max(1,(int)(baseEnemyDamage*mult));
+        float mult = AssetConfig.getZombieAtkMultiplier(selectedMap, wave);
+        if (wave==10) mult = Math.max(mult, 1.5f);
+        return Math.max(1, (int)(baseEnemyDamage*mult));
     }
 
     private void applyDamageToPlayer(int dmg, String message) {
-        player.setHp(Math.max(0,player.getHp()-dmg));
+        player.setHp(Math.max(0, player.getHp()-dmg));
         anim.playPlayerHit(dmg);
         log(message);
         checkPlayerDeath();
     }
 
+    // ── [v5] LAST CHANCE — animasi revival ───────────────────────────────
     private void checkPlayerDeath() {
-        if (player.getHp()<=0) {
+        if (player.getHp() <= 0) {
             if (player.hasLastChance()) {
+                // Nonaktifkan semua timer efek selama revival
+                stopAllEffectTimers();
                 player.setLastChance(false);
-                int revive=(int)(player.getMaxHp()*1f);
-                player.setHp(revive);
-                anim.playHeal(revive);
-                log("[!!!] LAST CHANCE AKTIF! Bangkit dengan "+revive+" HP (100% MaxHP)!");
-                SoundManager.play(SoundManager.LAST_CHANCE);
+                final int reviveHp = player.getMaxHp(); // 100% MaxHP
+
+                log("[!!!] LAST CHANCE AKTIF! Kebangkitan dimulai...");
+                btnAttack.setEnabled(false);
+                btnHeal.setEnabled(false);
+
+                // Putar animasi revival — semua aktivitas dibekukan di dalam AnimationEngine
+                anim.playLastChanceRevival(() -> {
+                    // Callback setelah animasi selesai
+                    player.setHp(reviveHp);
+                    log("[✦] Player bangkit kembali dengan "+reviveHp+" HP (100% MaxHP)!");
+
+                    // Restart timer efek map
+                    startMapEffects(wave);
+                    startZombieAdvance(wave);
+
+                    SwingUtilities.invokeLater(() -> visualPanel.requestFocusInWindow());
+                });
+
             } else {
                 btnAttack.setEnabled(false);
                 btnHeal.setEnabled(false);
-                // FIX-3: stopAllEffectTimers sekarang juga menghentikan proximityTimer
                 stopAllEffectTimers();
-                anim.playDeath(true,() -> {
+                anim.playDeath(true, () -> {
                     log("=== GAME OVER === Dikalahkan di Wave "+wave+"!");
                     SoundManager.play(SoundManager.GAME_OVER);
                     SoundManager.stopBGM();
@@ -806,31 +758,83 @@ public class GamePanel extends JPanel {
         }
     }
 
-    // FIX-3: Tambahkan proximityTimer ke dalam stopAllEffectTimers()
     private void stopAllEffectTimers() {
-        if (zombosMapDotTimer != null) zombosMapDotTimer.stop();
-        if (frozenTimer       != null) frozenTimer.stop();
-        if (zombieAdvanceTimer!= null) zombieAdvanceTimer.stop();
-        if (proximityTimer    != null) proximityTimer.stop(); // ← FIX: tambah ini
+        if (zombosMapDotTimer  != null) zombosMapDotTimer.stop();
+        if (frozenTimer        != null) frozenTimer.stop();
+        if (zombieAdvanceTimer != null) zombieAdvanceTimer.stop();
+        if (proximityTimer     != null) proximityTimer.stop();
     }
 
-    // ====================================================================
-    // DATABASE — Simpan progress
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+    // DATABASE — Simpan progress + Trigger Story
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * Simpan progress ke DB dan tampilkan StoryScreen jika belum pernah muncul.
+     * Story ditampilkan SETELAH overlay victory sudah dimulai (via delay timer).
+     */
     private void saveProgress(boolean won) {
         SessionManager session = SessionManager.getInstance();
         if (!session.isLoggedIn()) return;
+
         DatabaseManager.getInstance().saveGameResult(
-            session.getUserId(), this.selectedMap, this.wave, won
-        );
+                session.getUserId(), this.selectedMap, this.wave, won);
         session.refreshProgress();
-        System.out.println("[DB] Progress disimpan: map=" + selectedMap
-            + " wave=" + wave + " won=" + won);
+
+        if (won) {
+            // Tentukan story ID berdasarkan map yang baru dimenangkan
+            int storyId = -1;
+            DatabaseManager.GameProgress gp =
+                    DatabaseManager.getInstance().getProgress(session.getUserId());
+
+            switch (selectedMap) {
+                case "FOREST":
+                    if (!gp.storyForestWinShown) storyId = StoryScreen.STORY_FOREST_WIN;
+                    break;
+                case "UNESA":
+                    if (!gp.storyUnesaWinShown) storyId = StoryScreen.STORY_UNESA_WIN;
+                    break;
+                case "FROZEN":
+                    if (!gp.storyFrozenWinShown) storyId = StoryScreen.STORY_FROZEN_WIN;
+                    break;
+                case "MOUNTAIN":
+                    if (!gp.storyMountainWinShown) storyId = StoryScreen.STORY_MOUNTAIN_WIN;
+                    break;
+            }
+
+            if (storyId >= 0) {
+                final int finalStoryId = storyId;
+                // Tandai sudah ditampilkan sebelum benar-benar tampil
+                markStoryShown(session.getUserId(), selectedMap);
+
+                // Delay sedikit agar victory overlay sempat muncul dulu
+                Timer storyDelay = new Timer(2200, ev -> {
+                    Window parent = SwingUtilities.getWindowAncestor(GamePanel.this);
+                    StoryScreen.show(parent, finalStoryId);
+                    ((Timer)ev.getSource()).stop();
+                });
+                storyDelay.setRepeats(false);
+                storyDelay.start();
+            }
+        }
     }
 
-    // ====================================================================
+    /** Tandai story sebagai sudah ditampilkan dan simpan ke DB. */
+    private void markStoryShown(int userId, String mapKey) {
+        DatabaseManager.GameProgress gp = DatabaseManager.getInstance().getProgress(userId);
+        switch (mapKey) {
+            case "FOREST":   gp.storyForestWinShown   = true; break;
+            case "UNESA":    gp.storyUnesaWinShown     = true; break;
+            case "FROZEN":   gp.storyFrozenWinShown    = true; break;
+            case "MOUNTAIN": gp.storyMountainWinShown  = true; break;
+        }
+        DatabaseManager.getInstance().saveProgress(userId, gp);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
     // OVERLAY ANIMASI
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+
     private void startGameOverOverlay() {
         gameOver=true; overlayFrame=0;
         overlayTimer=new Timer(16,e->{overlayFrame++; visualPanel.repaint();});
@@ -845,29 +849,35 @@ public class GamePanel extends JPanel {
         addOverlayMouseListener();
     }
 
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
     // WAVE MANAGEMENT
-    // ====================================================================
+    // ════════════════════════════════════════════════════════════════════
+
     private void startWave(int w, boolean firstWave) {
-        this.wave=w;
+        this.wave = w;
         anim.setIsZomboss(w==10);
 
         if (w==10) loadBackground(AssetConfig.getBgForWave10());
         else       loadBackground(AssetConfig.getBgPath(selectedMap));
 
-        if (w==10) SoundManager.playBGM(SoundManager.BGM_BOSS);
-        else if (firstWave||w==1) SoundManager.playBGM(AssetConfig.getBgmForMap(selectedMap));
+        if (w==10)        SoundManager.playBGM(SoundManager.BGM_BOSS);
+        else if (firstWave) SoundManager.playBGM(AssetConfig.getBgmForMap(selectedMap));
 
         anim.playWaveIntro(w);
         stopAllEffectTimers();
+        // Restart proximity timer jika sudah berhenti
+        if (proximityTimer == null || !proximityTimer.isRunning()) {
+            proximityTimer = new Timer(800, e -> checkProximityDanger());
+            proximityTimer.start();
+        }
         startMapEffects(w);
 
-        Timer delay=new Timer(800,e->{
+        Timer delay = new Timer(800, e -> {
             log("─── WAVE "+w+(w==10?" — ⚠ ZOMBOSS!":"")+
-                " | Enemy HP:"+enemyMaxHpCache+" ATK:"+baseEnemyDamage+" ───");
-            anim.playEnemyEntrance(()->{
+                    " | Enemy HP:"+enemyMaxHpCache+" ATK:"+baseEnemyDamage+" ───");
+            anim.playEnemyEntrance(() -> {
                 log(currentEnemy.getName()+" muncul! (HP:"+currentEnemy.getHp()+
-                    " | ATK efektif:"+getEnemyEffectiveDamage()+")");
+                        " | ATK efektif:"+getEnemyEffectiveDamage()+")");
                 anim.setMovementEnabled(true);
                 startZombieAdvance(w);
                 SwingUtilities.invokeLater(() -> visualPanel.requestFocusInWindow());
@@ -882,11 +892,11 @@ public class GamePanel extends JPanel {
     }
 
     private void startZombosMapDot() {
-        zombosMapDotTimer=new Timer(AssetConfig.ZOMBOSS_MAP_DOT_INTERVAL,e->{
-            if (gameOver||victory||anim.isPaused()) return;
-            if (player.getHp()<=0) {zombosMapDotTimer.stop(); return;}
-            int dot=Math.max(1,(int)(player.getMaxHp()*AssetConfig.ZOMBOSS_MAP_DOT_PERCENT));
-            player.setHp(Math.max(0,player.getHp()-dot));
+        zombosMapDotTimer = new Timer(AssetConfig.ZOMBOSS_MAP_DOT_INTERVAL, e -> {
+            if (gameOver||victory||anim.isPaused()||anim.isReviving()) return;
+            if (player.getHp()<=0) { zombosMapDotTimer.stop(); return; }
+            int dot = Math.max(1,(int)(player.getMaxHp()*AssetConfig.ZOMBOSS_MAP_DOT_PERCENT));
+            player.setHp(Math.max(0, player.getHp()-dot));
             anim.playPlayerHit(dot);
             log("[🔥 Lingkungan] Neraka mengikis -"+dot+" HP!");
             checkPlayerDeath();
@@ -896,48 +906,47 @@ public class GamePanel extends JPanel {
     }
 
     private void startFreezeTimer(int w) {
-        int interval=AssetConfig.getFreezeInterval(w);
-        frozenTimer=new Timer(interval,e->{
-            if (gameOver||victory||anim.isPaused()) return;
-            if (player.getHp()<=0) {frozenTimer.stop(); return;}
+        int interval = AssetConfig.getFreezeInterval(w);
+        frozenTimer = new Timer(interval, e -> {
+            if (gameOver||victory||anim.isPaused()||anim.isReviving()) return;
+            if (player.getHp()<=0) { frozenTimer.stop(); return; }
             anim.playFreeze();
-            log("[❄ FROZEN] Kamu membeku selama "+(AssetConfig.FREEZE_DURATION_MS/1000)+
-                " detik! Tidak bisa attack/heal! Zombie menyerang bebas!");
-            int atk=getEnemyEffectiveDamage();
+            log("[❄ FROZEN] Kamu membeku selama "+(AssetConfig.FREEZE_DURATION_MS/1000)+" detik!");
+            int atk = getEnemyEffectiveDamage();
             anim.playZombieAttack();
-            applyDamageToPlayer(atk,"[❄] "+currentEnemy.getName()+" menyerang saat kamu beku! -"+atk+" HP");
-            Timer unfreezeTimer=new Timer(AssetConfig.FREEZE_DURATION_MS,ev->{
+            applyDamageToPlayer(atk, "[❄] "+currentEnemy.getName()+" menyerang saat beku! -"+atk+" HP");
+            Timer unfreezeTimer = new Timer(AssetConfig.FREEZE_DURATION_MS, ev -> {
                 anim.unfreeze();
-                log("[❄] Efek beku berakhir. Kamu bisa bergerak kembali!");
+                log("[❄] Efek beku berakhir.");
                 SwingUtilities.invokeLater(() -> visualPanel.requestFocusInWindow());
                 ((Timer)ev.getSource()).stop();
             });
-            unfreezeTimer.setRepeats(false);
-            unfreezeTimer.start();
+            unfreezeTimer.setRepeats(false); unfreezeTimer.start();
         });
         frozenTimer.start();
-        log("[❄] Map Tundra: Freeze periodik tiap ~"+interval/1000+" detik aktif!");
+        log("[❄] Map Tundra: Freeze periodik tiap ~"+interval/1000+"s!");
     }
 
     private void startZombieAdvance(int w) {
         stopZombieAdvance();
-        int interval="MOUNTAIN".equals(selectedMap)
-            ? AssetConfig.getMountainAttackInterval(w)
-            : AssetConfig.getDefaultAttackInterval(w);
+        int interval = "MOUNTAIN".equals(selectedMap)
+                ? AssetConfig.getMountainAttackInterval(w)
+                : AssetConfig.getDefaultAttackInterval(w);
 
-        zombieAdvanceTimer=new Timer(interval,e->{
+        zombieAdvanceTimer = new Timer(interval, e -> {
             if (gameOver||victory||anim.isPaused()) return;
-            if (currentEnemy.getHp()<=0||player.getHp()<=0){zombieAdvanceTimer.stop(); return;}
+            // [v5] Guard revival
+            if (anim.isReviving()) return;
+            if (currentEnemy.getHp()<=0||player.getHp()<=0) { zombieAdvanceTimer.stop(); return; }
             if (anim.isFrozen()) return;
 
             anim.playZombieAttack();
 
-            int dist=anim.getPlayerEnemyDistance();
-            if (dist<250) {
+            int dist = anim.getPlayerEnemyDistance();
+            if (dist < 250) {
                 if (!player.tryDodge()) {
-                    int dmg=getEnemyEffectiveDamage();
-                    applyDamageToPlayer(dmg,"[⏰ Zombie] "+currentEnemy.getName()+
-                        " menyerang otomatis! -"+dmg+" HP");
+                    int dmg = getEnemyEffectiveDamage();
+                    applyDamageToPlayer(dmg, "[⏰ Zombie] "+currentEnemy.getName()+" menyerang otomatis! -"+dmg+" HP");
                     if (wave==10) anim.playScreenShake(6);
                 } else {
                     anim.playMiss();
@@ -949,17 +958,17 @@ public class GamePanel extends JPanel {
         });
         zombieAdvanceTimer.start();
         log("[⏰] Zombie menyerang tiap "+interval/1000+"s! (Wave "+w+
-            ("MOUNTAIN".equals(selectedMap)?" — Mountain Mode!":"")+ ")");
+                ("MOUNTAIN".equals(selectedMap)?" — Mountain Mode!":"")+")");
     }
 
     private void stopZombieAdvance() {
-        if (zombieAdvanceTimer!=null) { zombieAdvanceTimer.stop(); zombieAdvanceTimer=null; }
+        if (zombieAdvanceTimer != null) { zombieAdvanceTimer.stop(); zombieAdvanceTimer=null; }
     }
 
     private void nextWave() {
-        int nextWave=wave+1;
-        if (nextWave>10) {
-            log(""); log("🏆 === VICTORY! HALAMANMU TELAH TERSELAMATKAN! === 🏆");
+        int nextWave = wave+1;
+        if (nextWave > 10) {
+            log(""); log("🏆 === VICTORY! === 🏆");
             SoundManager.play(SoundManager.VICTORY);
             SoundManager.stopBGM();
             btnAttack.setEnabled(false);
@@ -969,7 +978,7 @@ public class GamePanel extends JPanel {
             return;
         }
         log("");
-        if (nextWave>=2 && nextWave<=9) showBuffSelection();
+        if (nextWave >= 2 && nextWave <= 9) showBuffSelection();
         spawnEnemyForWave(nextWave);
         startWave(nextWave, false);
         SwingUtilities.invokeLater(() -> visualPanel.requestFocusInWindow());
@@ -977,39 +986,37 @@ public class GamePanel extends JPanel {
 
     private void showBuffSelection() {
         if (listBuff.isEmpty()) { log("(Tidak ada buff tersisa)"); return; }
-        Window parent=SwingUtilities.getWindowAncestor(this);
-        if (parent==null) return;
-        BuffDialog dialog=new BuffDialog(parent, player, listBuff);
+        Window parent = SwingUtilities.getWindowAncestor(this);
+        if (parent == null) return;
+        BuffDialog dialog = new BuffDialog(parent, player, listBuff);
         dialog.setVisible(true);
         SwingUtilities.invokeLater(() -> visualPanel.requestFocusInWindow());
-        updateButtonSub(btnAttack,"ATK: "+player.getDamage());
-        updateButtonSub(btnHeal,"Sisa: "+player.getHealLimit());
+        updateButtonSub(btnAttack, "ATK: "+player.getDamage());
+        updateButtonSub(btnHeal,   "Sisa: "+player.getHealLimit());
         if (player.getHealLimit()>0) btnHeal.setEnabled(true);
         log("Buff aktif! HP="+player.getHp()+"/"+player.getMaxHp()+" | ATK="+player.getDamage());
     }
 
     private void spawnEnemyForWave(int w) {
-        if (w==10) {
-            baseEnemyDamage=100;
-            enemyMaxHpCache=1000;
-            currentEnemy=new Zomboss("ZOMBOSS",750,baseEnemyDamage);
+        if (w == 10) {
+            baseEnemyDamage = 100; enemyMaxHpCache = 1000;
+            currentEnemy = new Zomboss("ZOMBOSS", 750, baseEnemyDamage);
         } else {
-            String[] zombieNames={
+            String[] names = {
                 "Basic Zombie","Zombie Penjaga","Zombie Berseragam",
                 "Zombie Penggali","Zombie Berlapis","Zombie Beracun",
                 "Zombie Raksasa","Zombie Berapi","Zombie Elite"
             };
-            String name=(w>=1&&w<=9)?zombieNames[w-1]:"Zombie Wave "+w;
-            int hp =AssetConfig.getZombieHp(w);
-            int atk=AssetConfig.getZombieAtk(w);
-            baseEnemyDamage=atk;
-            enemyMaxHpCache=hp;
-            currentEnemy=new Zombie(name,hp,atk);
+            String name = (w>=1&&w<=9) ? names[w-1] : "Zombie Wave "+w;
+            int hp  = AssetConfig.getZombieHp(w);
+            int atk = AssetConfig.getZombieAtk(w);
+            baseEnemyDamage = atk; enemyMaxHpCache = hp;
+            currentEnemy = new Zombie(name, hp, atk);
         }
     }
 
     private void initBuffs() {
-        listBuff=new ArrayList<>();
+        listBuff = new ArrayList<>();
         listBuff.add("God Slayer (+65 ATK)");
         listBuff.add("Punch Strike (+20 ATK)");
         listBuff.add("Steel Heart (+40 Max HP)");
@@ -1020,7 +1027,7 @@ public class GamePanel extends JPanel {
     }
 
     private void log(String msg) {
-        SwingUtilities.invokeLater(()->{
+        SwingUtilities.invokeLater(() -> {
             battleLog.append(msg+"\n");
             battleLog.setCaretPosition(battleLog.getDocument().getLength());
         });
