@@ -9,16 +9,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 /**
- * BuffDialog v3 — Pop-up pemilihan buff.
+ * BuffDialog v4 — Pop-up pemilihan buff.
  *
- * PERUBAHAN v3 (buff baru sesuai spesifikasi):
- *  - God Slayer      : ATK +65
- *  - Punch Strike    : ATK +20
- *  - Steel Heart     : MaxHP +40
- *  - Strong Defense  : MaxHP +65
- *  - Lifesteal       : ATK +15 + serap 10% maxHP setiap serangan
- *  - Invisible       : Dodge +10%, bertahap maks 50%
- *  - Last Chance     : Bangkit sekali dengan 25% maxHP
+ * PERUBAHAN v4:
+ *  [FIX-6] Notifikasi setelah memilih buff tidak lagi menggunakan
+ *          JOptionPane biasa. Diganti dengan BuffResultDialog — dialog
+ *          kustom bergaya dark-fantasy dengan animasi partikel emas,
+ *          ikon buff, dan efek glow pada border.
  */
 public class BuffDialog extends JDialog {
 
@@ -184,7 +181,6 @@ public class BuffDialog extends JDialog {
             g2.setColor(new Color(255,255,255,45)); g2.setStroke(new BasicStroke(1f));
             g2.drawLine(14,iconBot+4,w-14,iconBot+4);
 
-            // Nama buff
             String[] parts=nama.split(" \\(",2);
             String judul=parts[0];
             String detail=(parts.length>1)?"("+parts[1]:"";
@@ -200,13 +196,11 @@ public class BuffDialog extends JDialog {
         private void drawBuffIconFallback(Graphics2D g2, int w, int top, int bot) {
             int cx=w/2, cy=(top+bot)/2, R=(bot-top)/2-6;
             g2.setStroke(new BasicStroke(2f));
-
             if (nama.contains("Steel Heart")) {
                 drawShield(g2,cx,cy,R,new Color(80,140,255,190),new Color(150,200,255));
                 drawHeart(g2,cx,cy+4,R/3,new Color(255,70,100));
             } else if (nama.contains("Strong Defense")) {
                 drawShield(g2,cx,cy,R,new Color(180,140,30,190),new Color(255,220,80));
-                // Double shield
                 drawShield(g2,cx,cy+6,R*2/3,new Color(255,200,50,120),new Color(255,220,80));
             } else if (nama.contains("Punch Strike")) {
                 drawFist(g2,cx,cy,R);
@@ -229,7 +223,6 @@ public class BuffDialog extends JDialog {
             }
         }
 
-        // ---- Shape helpers ----
         private void drawShield(Graphics2D g2,int cx,int cy,int R,Color fill,Color stroke){
             int[] sx={cx,cx+R,cx+R,cx+R/2,cx,cx-R/2,cx-R,cx-R};
             int[] sy={cy+R,cy-R/3,cy-R,cy-R,cy-R-4,cy-R,cy-R,cy-R/3};
@@ -250,21 +243,16 @@ public class BuffDialog extends JDialog {
             g2.fillRoundRect(cx-5,cy+R/4+R/5,10,R/2,4,4);
         }
         private void drawFist(Graphics2D g2,int cx,int cy,int R){
-            // Kepalan tangan sederhana
             g2.setColor(new Color(255,160,60));
             g2.fillRoundRect(cx-R/2, cy-R/3, R, (int)(R*0.7), 8, 8);
-            // 4 jari
             int fw=R/5;
             for(int i=0;i<4;i++){
                 g2.fillRoundRect(cx-R/2+i*fw+2, cy-R/3-(int)(R*0.35), fw-2, (int)(R*0.4), 6,6);
             }
-            // Ibu jari
             g2.fillRoundRect(cx+R/2-2, cy-R/10, (int)(R*0.3), (int)(R*0.35), 6,6);
-            // Outline
             g2.setColor(new Color(200,100,30));
             g2.setStroke(new BasicStroke(2f));
             g2.drawRoundRect(cx-R/2, cy-R/3, R, (int)(R*0.7), 8, 8);
-            // Efek speed lines
             g2.setColor(new Color(255,220,100,160));
             g2.setStroke(new BasicStroke(2f));
             for(int i=0;i<3;i++){
@@ -309,7 +297,6 @@ public class BuffDialog extends JDialog {
             g2.drawString(s,(w-fm.stringWidth(s))/2,y);
         }
 
-        // ---- Warna per buff ----
         private Color resolveCardBg(String b){
             if(b.contains("Steel Heart"))    return new Color(25,50,110);
             if(b.contains("Strong Defense")) return new Color(70,50,10);
@@ -343,33 +330,29 @@ public class BuffDialog extends JDialog {
     }
 
     // =========================================================
-    // Logika terapkan buff — DIPERBARUI sesuai spesifikasi
+    // Logika terapkan buff
     // =========================================================
     private void terapkanBuff(Player p, String buffDiambil, ArrayList<String> listBuff) {
         String pesan;
 
         if (buffDiambil.contains("Steel Heart")) {
-            // MaxHP +40
             int bonus = 40;
             p.setMaxHp(p.getMaxHp() + bonus);
             p.setHp(Math.min(p.getHp() + bonus, p.getMaxHp()));
             pesan = "Max HP +" + bonus + "\nHP: " + p.getHp() + "/" + p.getMaxHp();
 
         } else if (buffDiambil.contains("Strong Defense")) {
-            // MaxHP +65
             int bonus = 65;
             p.setMaxHp(p.getMaxHp() + bonus);
             p.setHp(Math.min(p.getHp() + bonus, p.getMaxHp()));
             pesan = "Max HP +" + bonus + "\nHP: " + p.getHp() + "/" + p.getMaxHp();
 
         } else if (buffDiambil.contains("Punch Strike")) {
-            // ATK +20
             int bonus = 20;
             p.setDamage(p.getDamage() + bonus);
             pesan = "ATK +" + bonus + "\nATK: " + p.getDamage();
 
         } else if (buffDiambil.contains("God Slayer")) {
-            // ATK +65
             int bonus = 65;
             p.setDamage(p.getDamage() + bonus);
             pesan = "ATK +" + bonus + "\nATK: " + p.getDamage();
@@ -384,20 +367,16 @@ public class BuffDialog extends JDialog {
             }
 
         } else if (buffDiambil.contains("Lifesteal")) {
-            // ATK +15, aktifkan lifesteal (10% maxHP per serangan — dihandle di GamePanel)
             p.setDamage(p.getDamage() + 15);
             p.setLifesteal(true);
             listBuff.remove(buffDiambil);
             pesan = "ATK +15 + Lifesteal aktif!\nSerap 10% MaxHP setiap serang.\nATK: " + p.getDamage();
 
         } else if (buffDiambil.contains("Invisible")) {
-            // Dodge +15%, maks 75%
             int before = p.getInvisibleChance();
-            p.addInvisible(15); // addInvisible sudah cap di 75
-            // MAX 75%
+            p.addInvisible(15);
             if (p.getInvisibleChance() > 75) {
-                // Paksa set ke 75 via workaround
-                p.addInvisible(75 - p.getInvisibleChance()); // akan 0 atau negatif → tidak berubah
+                p.addInvisible(75 - p.getInvisibleChance());
             }
             int gained = p.getInvisibleChance() - before;
             pesan = "Dodge Chance +" + gained + "%\nTotal Dodge: " + p.getInvisibleChance() + "%";
@@ -407,8 +386,256 @@ public class BuffDialog extends JDialog {
         }
 
         SoundManager.play(SoundManager.BUFF_SELECT);
-        JOptionPane.showMessageDialog(this,
-            "✅ Buff Diterapkan!\n\n" + buffDiambil + "\n\n" + pesan,
-            "Buff Aktif!", JOptionPane.INFORMATION_MESSAGE);
+
+        // [FIX-6] Tampilkan dialog kustom bergaya dark-fantasy
+        showBuffResultDialog(buffDiambil, pesan);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // [FIX-6] BuffResultDialog — Notifikasi buff bergaya kece
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Dialog hasil pemilihan buff. Menggantikan JOptionPane biasa dengan:
+     *  - Background gradient gelap + partikel emas animasi
+     *  - Border glow berwarna sesuai buff
+     *  - Ikon buff (gambar / fallback glyph)
+     *  - Nama buff besar + detail kecil
+     *  - Tombol "Lanjutkan" kustom
+     */
+    private void showBuffResultDialog(String buffName, String detail) {
+        Color accent = resolveAccent(buffName);
+
+        JDialog dlg = new JDialog(this, Dialog.ModalityType.APPLICATION_MODAL);
+        dlg.setUndecorated(true);
+        dlg.setSize(420, 320);
+        dlg.setLocationRelativeTo(this);
+
+        // ── Anim partikel emas ─────────────────────────────────────────
+        int[] frame = {0};
+        float[] ptX = new float[30], ptY = new float[30];
+        float[] ptVX = new float[30], ptVY = new float[30];
+        for (int i = 0; i < 30; i++) {
+            ptX[i] = (float)(Math.random() * 420);
+            ptY[i] = (float)(Math.random() * 320);
+            ptVX[i] = (float)((Math.random()-0.5) * 1.2f);
+            ptVY[i] = -(float)(Math.random() * 1.5f + 0.5f);
+        }
+
+        JPanel panel = new JPanel(null) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+                int W = getWidth(), H = getHeight();
+
+                // Background
+                g2.setPaint(new GradientPaint(0, 0, new Color(10, 8, 25),
+                                              W, H, new Color(28, 12, 45)));
+                g2.fillRoundRect(0, 0, W, H, 16, 16);
+
+                // Partikel emas
+                for (int i = 0; i < ptX.length; i++) {
+                    float alpha = 0.15f + (float)(Math.sin(frame[0] * 0.06 + i) * 0.2);
+                    alpha = Math.max(0.05f, alpha);
+                    g2.setColor(new Color(255, 200, 50, (int)(alpha * 255)));
+                    int sz = (i % 4 == 0) ? 4 : 2;
+                    g2.fillOval((int)ptX[i], (int)ptY[i], sz, sz);
+                }
+
+                // Glow border berlapis
+                for (int r = 10; r >= 2; r -= 3) {
+                    int alpha2 = (int)(35 * (10 - r) / 10.0);
+                    g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha2));
+                    g2.setStroke(new BasicStroke(r));
+                    g2.drawRoundRect(r/2, r/2, W-r, H-r, 16, 16);
+                }
+                // Border utama
+                g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 200));
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(1, 1, W-3, H-3, 16, 16);
+
+                // Garis emas atas
+                g2.setPaint(new GradientPaint(0,0,new Color(100,70,0,0),W/2,0,new Color(255,200,50,160)));
+                g2.fillRect(0,0,W/2,2);
+                g2.setPaint(new GradientPaint(W/2,0,new Color(255,200,50,160),W,0,new Color(100,70,0,0)));
+                g2.fillRect(W/2,0,W/2,2);
+
+                // Header strip
+                g2.setPaint(new GradientPaint(0,0,accent.darker().darker(),W,0,accent.darker()));
+                g2.fillRoundRect(0, 0, W, 42, 16, 16);
+                g2.fillRect(0, 26, W, 16);
+
+                // Judul header
+                g2.setFont(new Font("Serif", Font.BOLD, 15));
+                g2.setColor(new Color(255, 255, 255, 220));
+                String header = "✅  Buff Diterapkan!";
+                FontMetrics fmH = g2.getFontMetrics();
+                g2.drawString(header, (W - fmH.stringWidth(header)) / 2, 27);
+
+                // Ikon buff (50×50 di kiri)
+                Image bImg = loadBuffImageFor(buffName);
+                int iconX = 24, iconY = 58, iconSz = 56;
+                if (bImg != null) {
+                    g2.drawImage(bImg, iconX, iconY, iconSz, iconSz, this);
+                } else {
+                    // Fallback lingkaran berwarna
+                    g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 80));
+                    g2.fillOval(iconX, iconY, iconSz, iconSz);
+                    g2.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 26));
+                    g2.setColor(accent);
+                    FontMetrics fmE = g2.getFontMetrics();
+                    String emoji = resolveEmoji(buffName);
+                    g2.drawString(emoji, iconX + (iconSz - fmE.stringWidth(emoji))/2,
+                                  iconY + iconSz/2 + fmE.getAscent()/2 - 4);
+                }
+
+                // Nama buff besar
+                g2.setFont(new Font("Serif", Font.BOLD, 20));
+                g2.setColor(accent.brighter());
+                String[] parts = buffName.split(" \\(", 2);
+                String buffTitle = parts[0];
+                FontMetrics fmT = g2.getFontMetrics();
+                int textX = iconX + iconSz + 16;
+                g2.setColor(new Color(0, 0, 0, 130));
+                g2.drawString(buffTitle, textX + 1, 79);
+                g2.setColor(accent.brighter());
+                g2.drawString(buffTitle, textX, 78);
+
+                // Detail multi-baris
+                g2.setFont(new Font("Arial", Font.PLAIN, 13));
+                g2.setColor(new Color(210, 195, 160));
+                String[] lines = detail.split("\n");
+                int ly = 100;
+                for (String line : lines) {
+                    g2.setColor(new Color(0, 0, 0, 100));
+                    g2.drawString(line, textX + 1, ly + 1);
+                    g2.setColor(new Color(210, 195, 160));
+                    g2.drawString(line, textX, ly);
+                    ly += 18;
+                }
+
+                // Separator tipis
+                g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 60));
+                g2.setStroke(new BasicStroke(1f));
+                g2.drawLine(20, 170, W - 20, 170);
+
+                // Tip kecil
+                g2.setFont(new Font("Arial", Font.ITALIC, 11));
+                g2.setColor(new Color(150, 140, 110, 180));
+                String tip = "💡 " + resolveTip(buffName);
+                FontMetrics fmTip = g2.getFontMetrics();
+                g2.drawString(tip, (W - fmTip.stringWidth(tip)) / 2, 190);
+
+                g2.dispose();
+            }
+        };
+        panel.setOpaque(false);
+
+        // Tombol "Lanjutkan"
+        JButton btnOk = new JButton() {
+            private boolean hov = false;
+            { addMouseListener(new MouseAdapter() {
+                public void mouseEntered(MouseEvent e) { hov = true;  repaint(); }
+                public void mouseExited (MouseEvent e) { hov = false; repaint(); }
+            }); }
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int w = getWidth(), h = getHeight();
+                Color c1 = hov ? accent.brighter() : accent.darker();
+                Color c2 = hov ? accent : accent.darker().darker();
+                g2.setPaint(new GradientPaint(0, 0, c1, 0, h, c2));
+                g2.fillRoundRect(0, 0, w, h, 10, 10);
+                if (hov) {
+                    g2.setColor(new Color(255, 255, 255, 80));
+                    g2.setStroke(new BasicStroke(2f));
+                    g2.drawRoundRect(1, 1, w-3, h-3, 10, 10);
+                }
+                g2.setFont(new Font("Serif", Font.BOLD, 15));
+                g2.setColor(Color.WHITE);
+                FontMetrics fm = g2.getFontMetrics();
+                String txt = "✔  Lanjutkan";
+                g2.drawString(txt, (w - fm.stringWidth(txt))/2, h/2 + fm.getAscent()/2 - 2);
+                g2.dispose();
+            }
+            @Override public Dimension getPreferredSize() { return new Dimension(160, 40); }
+        };
+        btnOk.setContentAreaFilled(false);
+        btnOk.setBorderPainted(false);
+        btnOk.setFocusPainted(false);
+        btnOk.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btnOk.setBounds(130, 220, 160, 40);
+        btnOk.addActionListener(e -> dlg.dispose());
+        panel.add(btnOk);
+
+        // Timer animasi partikel
+        Timer dlgAnim = new Timer(16, e -> {
+            frame[0]++;
+            for (int i = 0; i < ptX.length; i++) {
+                ptX[i] += ptVX[i];
+                ptY[i] += ptVY[i];
+                if (ptY[i] < -5) { ptY[i] = 325; ptX[i] = (float)(Math.random() * 420); }
+                if (ptX[i] < 0 || ptX[i] > 420) ptVX[i] = -ptVX[i];
+            }
+            panel.repaint();
+        });
+        dlgAnim.start();
+
+        dlg.addWindowListener(new WindowAdapter() {
+            @Override public void windowClosing(WindowEvent e) { dlgAnim.stop(); }
+            @Override public void windowClosed(WindowEvent e)  { dlgAnim.stop(); }
+        });
+
+        dlg.setContentPane(panel);
+        dlg.setVisible(true);
+    }
+
+    // Helper untuk BuffResultDialog
+    private Image loadBuffImageFor(String buffName) {
+        String path = AssetConfig.getBuffIconPath(buffName);
+        if (path == null) return null;
+        try {
+            java.net.URL url = getClass().getResource(path);
+            if (url != null) return new ImageIcon(url).getImage();
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private String resolveEmoji(String b) {
+        if(b.contains("Steel Heart"))    return "💙";
+        if(b.contains("Strong Defense")) return "🛡";
+        if(b.contains("Punch Strike"))   return "👊";
+        if(b.contains("God Slayer"))     return "⚡";
+        if(b.contains("Last Chance"))    return "🔥";
+        if(b.contains("Lifesteal"))      return "🩸";
+        if(b.contains("Invisible"))      return "👁";
+        return "✨";
+    }
+
+    private String resolveTip(String b) {
+        if(b.contains("Steel Heart"))    return "Tambah HP sekarang, bertahan lebih lama!";
+        if(b.contains("Strong Defense")) return "Pertahanan terkuat — cocok untuk map berat.";
+        if(b.contains("Punch Strike"))   return "Setiap pukulan kini terasa lebih menyakitkan!";
+        if(b.contains("God Slayer"))     return "ATK masif — satu serangan bisa mengubah segalanya.";
+        if(b.contains("Last Chance"))    return "Satu nyawa ekstra saat situasi kritis!";
+        if(b.contains("Lifesteal"))      return "Serang musuh = sembuhkan dirimu secara otomatis.";
+        if(b.contains("Invisible"))      return "Dodge makin tinggi = musuh sering meleset!";
+        return "Kekuatan baru menanti!";
+    }
+
+    private Color resolveAccent(String b) {
+        if(b.contains("Steel Heart"))    return new Color(100,175,255);
+        if(b.contains("Strong Defense")) return new Color(255,215,60);
+        if(b.contains("Punch Strike"))   return new Color(255,150,50);
+        if(b.contains("God Slayer"))     return new Color(255,195,40);
+        if(b.contains("Last Chance"))    return new Color(255,120,40);
+        if(b.contains("Lifesteal"))      return new Color(210,70,210);
+        if(b.contains("Invisible"))      return new Color(70,215,255);
+        return Color.WHITE;
     }
 }

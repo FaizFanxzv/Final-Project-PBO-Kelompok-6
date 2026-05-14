@@ -777,24 +777,159 @@ public class AuthScreen extends JFrame {
     }
 
     private JButton makeCloseButton() {
-        JButton btn = new JButton() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2=(Graphics2D)g.create();
-                g2.setColor(new Color(80,28,28));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),6,6);
-                g2.setFont(new Font("Arial",Font.BOLD,13));
-                g2.setColor(new Color(210,100,100));
-                FontMetrics fm=g2.getFontMetrics();
-                g2.drawString("✕",(getWidth()-fm.stringWidth("✕"))/2,getHeight()/2+fm.getAscent()/2-2);
-                g2.dispose();
-            }
-        };
-        btn.setContentAreaFilled(false); btn.setBorderPainted(false);
-        btn.setFocusPainted(false);      btn.setFocusable(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.addActionListener(e -> System.exit(0));
-        return btn;
+
+    // Load icon X dari ImageAssets
+    Image iconImg = null;
+
+    try {
+        java.net.URL url =
+                getClass().getResource("/ImageAssets/icon_close.png");
+
+        if (url != null) {
+
+            System.out.println("ICON FOUND: " + url);
+
+            // Load image TANPA getScaledInstance
+            iconImg = new ImageIcon(url).getImage();
+
+        } else {
+
+            System.out.println("ICON NOT FOUND!");
+
+        }
+
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+
+    final Image finalIcon = iconImg;
+
+    JButton btn = new JButton() {
+
+        private boolean hov = false;
+
+        {
+            addMouseListener(new MouseAdapter() {
+
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    hov = true;
+                    repaint();
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    hov = false;
+                    repaint();
+                }
+            });
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+
+            Graphics2D g2 = (Graphics2D) g.create();
+
+            g2.setRenderingHint(
+                    RenderingHints.KEY_ANTIALIASING,
+                    RenderingHints.VALUE_ANTIALIAS_ON
+            );
+
+            g2.setRenderingHint(
+                    RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR
+            );
+
+            int w = getWidth();
+            int h = getHeight();
+
+            // Background gradient
+            g2.setPaint(new GradientPaint(
+                    0, 0,
+                    hov
+                            ? new Color(160, 40, 40)
+                            : new Color(100, 25, 25),
+
+                    0, h,
+
+                    hov
+                            ? new Color(200, 60, 60)
+                            : new Color(130, 30, 30)
+            ));
+
+            g2.fillRoundRect(0, 0, w, h, 8, 8);
+
+            // Border
+            if (hov) {
+
+                g2.setColor(new Color(255, 100, 100, 120));
+                g2.setStroke(new BasicStroke(2f));
+
+            } else {
+
+                g2.setColor(new Color(180, 60, 60, 80));
+                g2.setStroke(new BasicStroke(1f));
+
+            }
+
+            g2.drawRoundRect(1, 1, w - 3, h - 3, 8, 8);
+
+            // Draw icon
+            if (finalIcon != null) {
+
+                int iw = 14;
+                int ih = 14;
+
+                g2.drawImage(
+                        finalIcon,
+                        (w - iw) / 2,
+                        (h - ih) / 2,
+                        iw,
+                        ih,
+                        null
+                );
+
+            } else {
+
+                // Fallback text
+                g2.setFont(new Font("Arial", Font.BOLD, 13));
+
+                g2.setColor(
+                        hov
+                                ? Color.WHITE
+                                : new Color(220, 120, 120)
+                );
+
+                String text = "✕";
+
+                FontMetrics fm = g2.getFontMetrics();
+
+                g2.drawString(
+                        text,
+                        (w - fm.stringWidth(text)) / 2,
+                        h / 2 + fm.getAscent() / 2 - 2
+                );
+            }
+
+            g2.dispose();
+        }
+    };
+
+    btn.setContentAreaFilled(false);
+    btn.setBorderPainted(false);
+    btn.setFocusPainted(false);
+    btn.setFocusable(false);
+
+    btn.setToolTipText("Keluar dari game");
+
+    btn.setCursor(
+            Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+    );
+
+    btn.addActionListener(e -> System.exit(0));
+
+    return btn;
+}
 
     private JLabel makeLabel(String text, int size, int style, Color color, int align) {
         JLabel l = new JLabel(text, align);

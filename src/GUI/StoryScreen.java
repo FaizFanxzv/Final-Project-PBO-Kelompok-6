@@ -7,18 +7,12 @@ import java.awt.event.*;
 /**
  * StoryScreen — Dialog narasi cerita game.
  *
- * Menampilkan teks cerita dengan:
- *  - Efek typewriter (huruf muncul satu per satu)
- *  - Auto-scroll mengikuti baris aktif
- *  - Background animasi bintang
- *  - Klik untuk skip ke akhir teks
- *
- * Ditampilkan di:
- *  - STORY_NEW_GAME     : pertama kali register akun baru
- *  - STORY_FOREST_WIN   : setelah menang di Map Forest
- *  - STORY_UNESA_WIN    : setelah menang di Map Unesa
- *  - STORY_FROZEN_WIN   : setelah menang di Map Frozen
- *  - STORY_MOUNTAIN_WIN : setelah menang di Map Mountain (+ credits)
+ * PERUBAHAN:
+ *  [FIX-2] Tambah onClose callback → setelah "Lanjutkan" ditekan, callback dijalankan
+ *           (digunakan GamePanel untuk navigasi ke PreGameScreen setelah win-story).
+ *  [FIX-5] Tambah scrolling manual (mouse wheel) + scrollbar visual di sisi kanan.
+ *          - Auto-scroll typewriter berhenti saat user scroll manual.
+ *          - Scrollbar muncul setelah teks selesai ditampilkan.
  */
 public class StoryScreen extends JDialog {
 
@@ -38,11 +32,12 @@ public class StoryScreen extends JDialog {
         {
             "◈  LAST CHANCE FOR LIFE  ◈",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "Kesempatan Terakhir untuk HIDUP",
             "",
             "Tahun 2047. Dunia tidak lagi mengenal kedamaian.",
             "",
-            "Sebuah virus misterius bocor dari laboratorium rahasia",
-            "dan menyebar ke seluruh dunia hanya dalam 72 jam.",
+            "Awal mula dari Zomboss yang ingin mencoba menguasai bumi",
+            "dan mulai menyebarkan pasukan zombienya ke seluruh dunia dengan cepat.",
             "Jutaan manusia berubah menjadi zombie haus darah.",
             "Kota-kota runtuh. Pemerintahan hancur. Peradaban musnah.",
             "",
@@ -50,13 +45,15 @@ public class StoryScreen extends JDialog {
             "Mereka berasal dari berbagai penjuru, berbeda latar belakang.",
             "Namun satu tekad menyatukan mereka:",
             "",
-            "  Menghentikan wabah ini. Sebelum semua berakhir.",
+            "  Menghentikan wabah ini. Sebelum semuanya berakhir.",
             "",
             "Mereka menyebut diri mereka — LAST CHANCE.",
             "Harapan terakhir umat manusia.",
             "",
             "Kamu adalah salah satu dari mereka.",
-            "Petualanganmu dimulai dari kegelapan Hutan Terlarang...",
+            "Petualanganmu dimulai dari kegelapan di Hutan Terlarang...",
+            "Knight Prince adalah Pangeran kerajaan yang telah gugur sedari lama efek zombie",
+            "Kini , Ia ingin membalaskan dendamnya dan siap berjuang mempertahankan Hutan Tercintanya itu.",
             "",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             "    ⚔  Bersiaplah. Pertarungan dimulai sekarang.  ⚔",
@@ -70,19 +67,22 @@ public class StoryScreen extends JDialog {
             "",
             "Zombie-zombie di Hutan Terlarang akhirnya tumbang.",
             "Keheningan kembali menyelimuti pepohonan yang hangus.",
+            "Knight Prince merasa lega dan mulai menjadi pengembara",
             "",
-            "Di antara puing dan abu, kamu menemukan sebuah radio rusak.",
-            "Dengan susah payah, radio itu menyala —",
+            "Di antara puing dan abu, ditemukan sebuah radio rusak.",
+            "Dengan susah payah, radio itu tiba tiba menyala —",
             "dan memutar satu pesan terakhir yang tersimpan di memorinya:",
             "",
             "  \"Kepada siapapun yang mendengar ini...\"",
             "  \"Kami berlindung di Kampus Unesa, Surabaya.\"",
-            "  \"Para ilmuwan kami sedang mengembangkan antidot.\"",
-            "  \"Tapi zombie semakin banyak dan semakin kuat.\"",
-            "  \"Tolong... datangi kami sebelum terlambat.\"",
-            "               — Dr. Putri, Peneliti Virologi Unesa",
+            "  \"Zombie zombie sudah mengepung wilayah ini.\"",
+            "  \"Para peneliti yang mengkaji virus ini satu persatu berhasil ditumbangkan.\"",
+            "  \"Sungguh, Zombie disini semakin brutal.\"",
+            "  \"Tolong kami... datanglah secepatnya sebelum tempat ini musnah.\"",
+            "               — Dr. Sonjibar, Peneliti sekaligus Dosen PTI Unesa",
             "",
-            "Antidot! Inilah harapan yang selama ini dicari.",
+            "penelitain itu! ialah harapan yang selama ini dicari.",
+            "jawaban untuk memberantas para zombie zombie di muka bumi",
             "Kamu harus segera menuju Kampus Unesa.",
             "Tapi para zombie telah mengepung seluruh area kampus...",
             "",
@@ -97,25 +97,26 @@ public class StoryScreen extends JDialog {
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             "",
             "Kampus Unesa akhirnya bebas dari invasi zombie!",
-            "Para ilmuwan selamat setelah berminggu-minggu terkurung.",
+            "Para peneliti yang tersisa selamat setelah berminggu-minggu terisolasi.",
             "",
-            "Dr. Putri menyambutmu dengan air mata bercucuran.",
-            "  \"Tanpamu, kami sudah tidak bisa bertahan malam ini...\"",
+            "Dr. Sonjibar menyambutmu dengan air mata yang bercucuran.",
+            "  \"Tanpa kehadiranmu, kami sudah tidak bisa bertahan lebih lama lagi...\"",
             "",
-            "Ia membuka peta tua di atas meja dan menunjukkan sebuah titik.",
-            "  \"Antidot hampir selesai. Tapi kami butuh satu bahan terakhir —\"",
-            "  \"Kristal Beku dari Tundra Utara.\"",
+            "Ia membuka hasil penelitian di dalam dokumen dan menunjukkan sebuah titik.",
+            "  \"jawaban atas segalanya sudah ditemukan. Tapi kami butuh rekan —\"",
+            "  \"Temuilah Raymond dari Tundra Utara.\"",
             "",
             "  \"Suhu di sana bisa membekukan tulangmu dalam hitungan menit.\"",
+            "  \"Tapi dengan bantuan Raymond, semua akan baik baik saja.\"",
             "  \"Zombie di sana pun berbeda — mereka bermutasi karena hawa beku.\"",
             "  \"Tidak ada yang pernah berhasil kembali dari sana.\"",
             "",
             "Kamu mengambil peta itu tanpa berkata apa-apa.",
             "Tidak ada pilihan lain jika ingin menyelamatkan dunia.",
-            "Demi antidot yang akan mengakhiri semuanya.",
+            "Demi sebuah Jawaban yang akan mengakhiri semuanya.",
             "",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "         Tujuan berikutnya: Tundra Beku, Utara.",
+            "         Tujuan berikutnya: Tundra Beku, Puncak Salju.",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         },
 
@@ -124,33 +125,41 @@ public class StoryScreen extends JDialog {
             "❄  TUNDRA BEKU — DITAKLUKKAN  ❄",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             "",
-            "Kristal Beku berhasil kamu raih dari jantung tundra!",
+            "Kamu berhasil memberantas Zombie di Wilaya Tundra !",
             "Tanganmu gemetar kedinginan, tapi matamu menyala penuh tekad.",
             "",
             "Tiba-tiba, langit gelap dibelah oleh tawa yang mengerikan.",
             "",
-            "  \"HAHAHA! Kamu pikir antidot bisa menghentikanku?!\"",
+            "  \"HAHAHA! Kamu pikir hanya dengan memberantas zombie disini kau bisa menghentikanku?!\"",
             "",
             "Dari balik awan hitam, sosok raksasa melayang turun.",
+            "ialah Raja terakhir Boss para Zombie",
             "ZOMBOSS — sang pencipta virus, arsitek kehancuran dunia.",
             "",
-            "  \"Aku telah membangun pasukan terakhirku di Gunung Berapi!\"",
-            "  \"Ketika gunung itu meletus, abunya akan menyebar ke atmosfer —\"",
-            "  \"Dan setiap manusia yang menghirupnya akan BERUBAH selamanya!\"",
+            "  \"HEBAT JUGA KAMU ! Jangan harap bisa selamat !\"",
+            "  \"Lihatlah di Pegunungan sana , Ketika gunung itu meletus, abunya akan menyebar ke atmosfer —\"",
+            "  \"Dan setiap manusia yang menghirupnya akan BERUBAH selamanya! HAHAHAHA \"",
             "",
             "Zomboss menghilang ke balik awan dengan tawa membahana.",
+            "Zomboss itu abadi , butuh sebuah trik mengalahkannya. Ini adalah kesempatan terakhir !",
             "",
-            "Gunung Berapi harus dihentikan. SEKARANG.",
-            "Sebelum manusia terakhir di bumi ini pun musnah.",
+            "Sebentar ! Mountain disaa berbahaya ! Jangkauan Zombie lebih luas dan lebih brutal",
+            "Raymond : Xavier penduduk asli sana , tapi keangkuhannya berbeda dengan diriku",
+            "Xavier tidak peduli apapun yang terjadi dengan bumi dan siapapun. pasti disaat dirinya dalam bahaya",
+            "Disitulah dia akan berpihak pada kita",
+            "",
+            "CEPAT !",
+            "Pegunungan itu shearusnya pasif jadi harus dihentikan. SEKARANG.",
+            "Sebelum manusia yang tersisa di bumi ini pun ikut musnah.",
             "",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "     Tujuan berikutnya: Gunung Berapi, Selatan.",
+            "     Tujuan berikutnya: Mountain, Pegunungan pasif.",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         },
 
         // ── 4: SETELAH MENANG MOUNTAIN + CREDITS ─────────────────────────
         {
-            "🌋  GUNUNG BERAPI — DISELAMATKAN  🌋",
+            "🌋  MOUNTAIN — DISELAMATKAN  🌋",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             "",
             "Pasukan terakhir Zomboss jatuh satu per satu!",
@@ -160,9 +169,9 @@ public class StoryScreen extends JDialog {
             "Tapi dari kejauhan, sebuah portal gelap terbuka.",
             "Zomboss melangkah masuk, matanya merah membara.",
             "",
-            "  \"Kamu memang kuat, manusia kecil...\"",
-            "  \"Tapi ini hanyalah PEMBUKA dari rencanaku yang sesungguhnya!\"",
-            "  \"Temui aku di Nerakaku — jika kamu berani!\"",
+            "  \"Kamu memang kuat, tapi masih LEMAH...\"",
+            "  \"Tapi, ini hanyalah PEMBUKA dari rencanaku yang sesungguhnya!\"",
+            "  \"Temui aku di Nerakaku — jika kamu berani! HAHAHAHAHAHA \"",
             "",
             "Portal itu menutup. Zomboss lenyap ke dimensi lain.",
             "Neraka Zomboss — domain abadi sang Penguasa Zombie.",
@@ -182,32 +191,37 @@ public class StoryScreen extends JDialog {
             "                  🏆  CREDITS  🏆",
             "",
             "     Game Concept & Story Design",
-            "         Tim Pengembang LCFL",
+            "         Kelompok 6 PTI 2025D Comelzz",
             "",
-            "     Character Design & Illustration",
-            "         Divisi Kreatif Visual",
+            "     Character Design & Illustration Animation",
+            "         Arafina Aazahra",
             "",
-            "     Programming & Game Engine",
-            "         Tim Backend & Logic",
+            "     Programming & Game Logic",
+            "         Muhammad Faiz Risqullah Ramadhan",
             "",
-            "     Music & Sound Effects",
-            "         Tim Produksi Audio",
+            "     Music & Sound Effects , Combat System",
+            "         Varsaretha Najmi R",
             "",
-            "     Quality Assurance & Testing",
-            "         Para Tester Setia",
+            "     UI/UX Scene Management & Testing",
+            "         Ahmad Khadik Mustawan'alwi",
+            "",
+            "     Logic Program Flow",
+            "         Bunga Aulia Maharani",
             "",
             "     Special Thanks",
+            "         Dosen Matkul PBO PTI Unesa , Bpk. Mohammad Sonhaji Akbar, S.Pd.,M.Kom.",
             "         Universitas Negeri Surabaya (UNESA)",
             "         Seluruh pemain yang mendukung game ini",
             "         Keluarga dan sahabat para developer",
             "",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "           © 2024  LAST CHANCE FOR LIFE",
-            "       Dibuat dengan ❤ di Surabaya, Indonesia",
+            "           © 2026  LAST CHANCE FOR LIFE",
+            "       Dikembangkan di Surabaya, Indonesia",
+            "       Dibuat dengan ❤️ — Semoga dunia tidak benar-benar diserang zombie ",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             "",
             "         Satu pertempuran lagi menanti...",
-            "        Siapkah kamu menghadapi ZOMBOSS?"
+            "        Siapkah kamu menghadapi ZOMBOSS di Markasnya ?"
         }
     };
 
@@ -217,6 +231,12 @@ public class StoryScreen extends JDialog {
     private float scrollOffset   = 0;
     private int   animFrame      = 0;
     private boolean done         = false;
+
+    // [FIX-5] Flag: apakah user sudah scroll manual (matikan auto-scroll)
+    private boolean userScrolled = false;
+
+    // [FIX-2] Callback setelah dialog ditutup
+    private Runnable onClose;
 
     private final javax.swing.Timer typeTimer;
     private final javax.swing.Timer animTimer;
@@ -300,13 +320,55 @@ public class StoryScreen extends JDialog {
                     displayedChars = totalChars();
                     scrollOffset   = totalScrollTarget();
                     done = true;
+                    userScrolled = false; // reset so we land at bottom
                     btnContinue.setVisible(true);
                     canvas.repaint();
                 }
             }
         });
 
+        // [FIX-5] Mouse wheel scrolling
+        canvas.addMouseWheelListener(e -> {
+            userScrolled = true;
+            float delta = e.getWheelRotation() * LINE_H * 1.8f;
+            scrollOffset += delta;
+            float maxScroll = computeMaxScroll();
+            scrollOffset = Math.max(0f, Math.min(scrollOffset, maxScroll));
+            canvas.repaint();
+        });
+
+        // Keyboard scrolling (Arrow keys) when canvas is focused
+        canvas.setFocusable(true);
+        canvas.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                float maxScroll = computeMaxScroll();
+                switch (e.getKeyCode()) {
+                    case KeyEvent.VK_DOWN:
+                    case KeyEvent.VK_PAGE_DOWN:
+                        userScrolled = true;
+                        scrollOffset = Math.min(scrollOffset + LINE_H * 3, maxScroll);
+                        canvas.repaint(); break;
+                    case KeyEvent.VK_UP:
+                    case KeyEvent.VK_PAGE_UP:
+                        userScrolled = true;
+                        scrollOffset = Math.max(0, scrollOffset - LINE_H * 3);
+                        canvas.repaint(); break;
+                    case KeyEvent.VK_END:
+                        userScrolled = false;
+                        scrollOffset = maxScroll;
+                        if (!done) {
+                            displayedChars = totalChars();
+                            done = true;
+                            btnContinue.setVisible(true);
+                        }
+                        canvas.repaint(); break;
+                }
+            }
+        });
+
         setContentPane(canvas);
+        SwingUtilities.invokeLater(() -> canvas.requestFocusInWindow());
     }
 
     // ── Tick typewriter ───────────────────────────────────────────────────
@@ -318,15 +380,18 @@ public class StoryScreen extends JDialog {
             done = true;
             btnContinue.setVisible(true);
         }
-        // Hitung baris aktif untuk auto-scroll
-        float counted = 0;
-        int lineIdx   = 0;
-        for (int i = 0; i < lines.length; i++) {
-            counted += lines[i].length() + 1;
-            if (counted >= displayedChars) { lineIdx = i; break; }
+
+        // [FIX-5] Auto-scroll hanya jika user belum scroll manual
+        if (!userScrolled) {
+            float counted = 0;
+            int lineIdx   = 0;
+            for (int i = 0; i < lines.length; i++) {
+                counted += lines[i].length() + 1;
+                if (counted >= displayedChars) { lineIdx = i; break; }
+            }
+            float target = Math.max(0f, lineIdx * LINE_H - 300f);
+            scrollOffset += (target - scrollOffset) * 0.09f;
         }
-        float target = Math.max(0f, lineIdx * LINE_H - 300f);
-        scrollOffset += (target - scrollOffset) * 0.09f;
 
         canvas.repaint();
     }
@@ -339,6 +404,11 @@ public class StoryScreen extends JDialog {
 
     private float totalScrollTarget() {
         return Math.max(0, lines.length * LINE_H - 300f);
+    }
+
+    private float computeMaxScroll() {
+        int contentH = canvas.getHeight() - 80;
+        return Math.max(0f, lines.length * LINE_H - contentH + 36f);
     }
 
     // ── Draw ──────────────────────────────────────────────────────────────
@@ -374,7 +444,7 @@ public class StoryScreen extends JDialog {
         // ── Area konten teks (clipped) ────────────────────────────────────
         int contentTop = 18;
         int contentH   = H - 80;
-        g2.setClip(0, contentTop, W, contentH);
+        g2.setClip(0, contentTop, W - 16, contentH); // leave space for scrollbar
 
         float charsRem = displayedChars;
         int   y        = contentTop + 18 - (int) scrollOffset;
@@ -387,7 +457,7 @@ public class StoryScreen extends JDialog {
             charsRem -= (len + 1);
 
             if (y >= contentTop - LINE_H && y <= contentTop + contentH + LINE_H) {
-                if (!line.isEmpty()) drawStoryLine(g2, toShow, line, W, y);
+                if (!line.isEmpty()) drawStoryLine(g2, toShow, line, W - 16, y);
             }
             y += LINE_H;
         }
@@ -402,20 +472,55 @@ public class StoryScreen extends JDialog {
         }
         g2.setClip(null);
 
-        // Fade top/bottom untuk efek scroll
+        // Fade top/bottom
         g2.setPaint(new GradientPaint(0, contentTop, new Color(5,3,14,200), 0, contentTop+24, new Color(5,3,14,0)));
         g2.fillRect(0, contentTop, W, 24);
         g2.setPaint(new GradientPaint(0, contentTop+contentH-20, new Color(5,3,14,0), 0, contentTop+contentH, new Color(5,3,14,220)));
         g2.fillRect(0, contentTop+contentH-20, W, 20);
 
-        // Hint klik
+        // [FIX-5] Scrollbar visual di sisi kanan
+        drawScrollbar(g2, contentTop, contentH, W);
+
+        // Hint bawah
+        g2.setFont(new Font("Arial", Font.ITALIC, 11));
+        g2.setColor(new Color(150, 130, 80, 150));
+        String hint;
         if (!done) {
-            g2.setFont(new Font("Arial", Font.ITALIC, 11));
-            g2.setColor(new Color(150, 130, 80, 150));
-            String hint = "[ Klik di mana saja untuk langsung ke akhir ]";
-            FontMetrics fmH = g2.getFontMetrics();
-            g2.drawString(hint, (W-fmH.stringWidth(hint))/2, H - 9);
+            hint = "[ Klik di mana saja untuk langsung ke akhir ]";
+        } else {
+            hint = "[ ↑↓ / Scroll untuk membaca  |  Lanjutkan untuk melanjutkan ]";
         }
+        FontMetrics fmH = g2.getFontMetrics();
+        g2.drawString(hint, (W-fmH.stringWidth(hint))/2, H - 9);
+    }
+
+    // [FIX-5] Gambar scrollbar
+    private void drawScrollbar(Graphics2D g2, int contentTop, int contentH, int W) {
+        float maxScroll = computeMaxScroll();
+        if (maxScroll <= 0) return;
+
+        int sbX     = W - 10;
+        int sbTrackH = contentH;
+
+        // Track (latar scrollbar)
+        g2.setColor(new Color(60, 50, 20, 80));
+        g2.fillRoundRect(sbX, contentTop, 6, sbTrackH, 3, 3);
+
+        // Thumb (indicator posisi)
+        float visibleRatio = Math.min(1f, (float)(contentH) / (lines.length * LINE_H));
+        int   thumbH       = Math.max(28, (int)(sbTrackH * visibleRatio));
+        float scrollPct    = (maxScroll > 0) ? Math.min(1f, scrollOffset / maxScroll) : 0f;
+        int   thumbY       = contentTop + (int)((sbTrackH - thumbH) * scrollPct);
+
+        Color thumbColor = done ? new Color(255, 200, 50, 200) : new Color(180, 140, 40, 140);
+        g2.setColor(thumbColor);
+        g2.fillRoundRect(sbX, thumbY, 6, thumbH, 3, 3);
+
+        // Arrow atas
+        g2.setColor(new Color(200, 160, 50, 150));
+        g2.setFont(new Font("Arial", Font.PLAIN, 9));
+        g2.drawString("▲", sbX, contentTop + 10);
+        g2.drawString("▼", sbX, contentTop + sbTrackH + 2);
     }
 
     private void drawStoryLine(Graphics2D g2, String toShow, String fullLine, int W, int y) {
@@ -463,10 +568,8 @@ public class StoryScreen extends JDialog {
         }
 
         g2.setFont(font);
-        // Bayangan
         g2.setColor(new Color(0, 0, 0, 120));
         g2.drawString(toShow, tx+1, y+1);
-        // Teks
         g2.setColor(color);
         g2.drawString(toShow, tx, y);
     }
@@ -476,14 +579,28 @@ public class StoryScreen extends JDialog {
         typeTimer.stop();
         animTimer.stop();
         dispose();
+        // [FIX-2] Jalankan callback setelah dialog tertutup
+        if (onClose != null) {
+            SwingUtilities.invokeLater(onClose);
+        }
     }
 
-    // ── Static helper ─────────────────────────────────────────────────────
+    // ── Static helpers ────────────────────────────────────────────────────
+
     /**
-     * Tampilkan story dialog secara modal.
-     * Memanggil blokir hingga user menutup dialog.
+     * Tampilkan story dialog secara modal (tanpa callback).
      */
     public static void show(Window parent, int storyId) {
         new StoryScreen(parent, storyId).setVisible(true);
+    }
+
+    /**
+     * [FIX-2] Tampilkan story dialog secara modal dengan callback setelah tutup.
+     * Berguna saat GamePanel ingin navigasi ke PreGameScreen setelah win-story.
+     */
+    public static void show(Window parent, int storyId, Runnable onClose) {
+        StoryScreen s = new StoryScreen(parent, storyId);
+        s.onClose = onClose;
+        s.setVisible(true);
     }
 }

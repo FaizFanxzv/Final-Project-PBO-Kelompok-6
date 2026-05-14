@@ -7,12 +7,14 @@ import java.awt.event.*;
 import java.awt.geom.*;
 
 /**
- * PreGameScreen v3 — Layar pemilihan karakter & map.
+ * PreGameScreen v4 — Layar pemilihan karakter & map.
  *
- * PERBAIKAN BUG (Revisi):
- *  [FIX-6] hoverTimer di CharCard dan MapCard dihentikan via HierarchyListener saat panel disembunyikan
- *  [FIX-7] startGame() — fallback akhir "Hero" jika playerName dan session keduanya kosong
- *  [FIX-8] confirmLogout() & confirmExit() — UIManager reset dibungkus try-finally agar selalu terjadi
+ * PERUBAHAN v4:
+ *  [FIX-1] lblMapInfoDynamic: tinggi kotak diperbesar secara adaptif dan
+ *          teks sinergi digambar di baris baru yang tidak menumpuk dengan
+ *          deskripsi map. Semua baris dihitung terlebih dahulu sebelum digambar
+ *          sehingga tidak ada lagi penumpukan elemen saat Map Unesa +
+ *          Unesa Boys / Unesa Girls dipilih.
  */
 public class PreGameScreen extends JFrame {
 
@@ -35,6 +37,10 @@ public class PreGameScreen extends JFrame {
     private Timer animTimer;
     private int   animFrame = 0;
     private Image bgImage;
+
+    // ─── Konstanta layout info‑box ────────────────────────────────────────
+    /** Tinggi maksimum kotak info map (px). Cukup untuk 4 baris + sinergi. */
+    private static final int MAP_INFO_H = 96;
 
     // ═══════════════════════════════════════════════════════════════════════
     public PreGameScreen() {
@@ -62,7 +68,7 @@ public class PreGameScreen extends JFrame {
                 drawBackground((Graphics2D) g);
             }
         };
-        root.setPreferredSize(new Dimension(1020, 700));
+        root.setPreferredSize(new Dimension(1020, 720)); // +20 tinggi untuk ruang info box
         root.setBackground(new Color(8, 6, 18));
 
         buildUI(root);
@@ -83,7 +89,7 @@ public class PreGameScreen extends JFrame {
     // ═══════════════════════════════════════════════════════════════════════
 
     private void drawBackground(Graphics2D g2) {
-        int W = 1020, H = 700;
+        int W = 1020, H = 720;
         if (bgImage != null) {
             g2.drawImage(bgImage, 0, 0, W, H, this);
             g2.setColor(new Color(4, 2, 14, 205));
@@ -144,6 +150,7 @@ public class PreGameScreen extends JFrame {
         volSlider.setBounds(515, 108, 120, 26);
         root.add(volSlider);
 
+        // ── Karakter ────────────────────────────────────────────────────────
         JLabel lblChar = makeLabel("👤  Pilih Karakter", 13, Font.BOLD, new Color(220,180,80), SwingConstants.LEFT);
         lblChar.setBounds(60, 148, 300, 22);
         root.add(lblChar);
@@ -174,6 +181,7 @@ public class PreGameScreen extends JFrame {
 
         root.add(makeSep(60, 374, W-120, 1));
 
+        // ── Map ─────────────────────────────────────────────────────────────
         JLabel lblMap = makeLabel("🗺  Pilih Medan Perang", 13, Font.BOLD, new Color(220,180,80), SwingConstants.LEFT);
         lblMap.setBounds(60, 382, 300, 22);
         root.add(lblMap);
@@ -202,12 +210,14 @@ public class PreGameScreen extends JFrame {
             });
         }
 
+        // [FIX-1] Kotak info map — tinggi diperbesar ke MAP_INFO_H agar tidak tumpang-tindih
         lblMapInfoDynamic = buildMapInfoLabel();
-        lblMapInfoDynamic.setBounds(60, 542, W-120, 80);
+        lblMapInfoDynamic.setBounds(60, 542, W-120, MAP_INFO_H);
         root.add(lblMapInfoDynamic);
 
+        // Tombol mulai diturunkan agar tidak tertimpa info box
         btnStart = makeStartButton();
-        btnStart.setBounds((W-320)/2, 634, 320, 52);
+        btnStart.setBounds((W-320)/2, 648, 320, 52);
         root.add(btnStart);
 
         selectChar(selectedChar);
@@ -248,86 +258,95 @@ public class PreGameScreen extends JFrame {
     }
 
     private void addHeaderButtons(JPanel root, int W) {
-        JButton btnClose = new JButton("✕") {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2=(Graphics2D)g.create();
-                g2.setColor(new Color(80,30,30));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),6,6);
-                g2.setFont(new Font("Arial",Font.BOLD,13));
-                g2.setColor(new Color(200,100,100));
-                FontMetrics fm=g2.getFontMetrics();
-                g2.drawString("✕",(getWidth()-fm.stringWidth("✕"))/2,getHeight()/2+fm.getAscent()/2-2);
-                g2.dispose();
-            }
-        };
-        btnClose.setContentAreaFilled(false);
-        btnClose.setBorderPainted(false);
-        btnClose.setFocusPainted(false);
-        btnClose.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btnClose.setBounds(W-36, 6, 28, 24);
-        btnClose.addActionListener(e -> confirmExit());
-        root.add(btnClose);
+    // ✂ Blok btnClose DIHAPUS SELURUHNYA
 
-        JButton btnLogout = new JButton("🚪 Logout") {
-            private boolean hov=false;
-            { addMouseListener(new MouseAdapter(){
-                public void mouseEntered(MouseEvent e){hov=true;repaint();}
-                public void mouseExited(MouseEvent e){hov=false;repaint();}
-            }); }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2=(Graphics2D)g.create();
-                g2.setColor(hov?new Color(80,30,30):new Color(55,20,20));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),8,8);
-                g2.setFont(new Font("Serif",Font.PLAIN,12));
-                g2.setColor(new Color(200,120,100));
-                FontMetrics fm=g2.getFontMetrics();
-                String t=getText();
-                g2.drawString(t,(getWidth()-fm.stringWidth(t))/2,getHeight()/2+fm.getAscent()/2-2);
-                g2.dispose();
-            }
-            @Override public Dimension getPreferredSize(){return new Dimension(90,26);}
-        };
-        btnLogout.setContentAreaFilled(false);
-        btnLogout.setBorderPainted(false);
-        btnLogout.setFocusPainted(false);
-        btnLogout.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btnLogout.setBounds(W-130, 6, 90, 26);
-        btnLogout.addActionListener(e -> confirmLogout());
-        root.add(btnLogout);
-    }
+    JButton btnLogout = new JButton("🚪 Logout") {
+        private boolean hov = false;
+        { addMouseListener(new MouseAdapter(){
+            public void mouseEntered(MouseEvent e){ hov=true; repaint(); }
+            public void mouseExited (MouseEvent e){ hov=false; repaint(); }
+        }); }
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2=(Graphics2D)g.create();
+            g2.setColor(hov ? new Color(80,30,30) : new Color(55,20,20));
+            g2.fillRoundRect(0,0,getWidth(),getHeight(),8,8);
+            g2.setFont(new Font("Serif",Font.PLAIN,12));
+            g2.setColor(new Color(200,120,100));
+            FontMetrics fm=g2.getFontMetrics();
+            String t=getText();
+            g2.drawString(t,(getWidth()-fm.stringWidth(t))/2,
+                           getHeight()/2+fm.getAscent()/2-2);
+            g2.dispose();
+        }
+        @Override public Dimension getPreferredSize(){return new Dimension(90,26);}
+    };
+    btnLogout.setContentAreaFilled(false);
+    btnLogout.setBorderPainted(false);
+    btnLogout.setFocusPainted(false);
+    btnLogout.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    btnLogout.setBounds(W-100, 6, 90, 26); // ← digeser ke kanan penuh
+    btnLogout.addActionListener(e -> confirmLogout());
+    root.add(btnLogout);
+}
 
-    // ── Map Info Label ───────────────────────────────────────────────────
-
+    // ── [FIX-1] Map Info Label ────────────────────────────────────────────
+    /**
+     * Menggambar kotak info map dengan layout baris yang dihitung terlebih
+     * dahulu, sehingga teks sinergi tidak menumpuk di atas deskripsi map.
+     *
+     * Layout baris (Y dari atas kotak, padding 10 px):
+     *   Baris 1 (y=20) : nama map
+     *   Baris 2 (y=36) : BGM
+     *   Baris 3 (y=54) : desc[0]
+     *   Baris 4 (y=70) : desc[1] (opsional, hanya jika ada)
+     *   Baris 5 (y=86) : sinergi (opsional, hanya jika ada)
+     */
     private JLabel buildMapInfoLabel() {
         JLabel lbl = new JLabel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2=(Graphics2D)g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+
+                int W = getWidth(), H = getHeight();
+
+                // Latar
                 g2.setColor(new Color(12,9,25,200));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),10,10);
+                g2.fillRoundRect(0,0,W,H,10,10);
                 g2.setColor(new Color(120,90,30,100));
                 g2.setStroke(new BasicStroke(1f));
-                g2.drawRoundRect(1,1,getWidth()-3,getHeight()-3,10,10);
+                g2.drawRoundRect(1,1,W-3,H-3,10,10);
 
+                String[] desc    = AssetConfig.getMapDesc(selectedMap);
+                String   sinergi = getSinergiText();
+
+                // -- Baris 1: Nama Map --
                 g2.setFont(new Font("Arial",Font.BOLD,12));
                 g2.setColor(new Color(255,200,60));
                 g2.drawString("🗺 " + AssetConfig.getMapName(selectedMap), 10, 20);
 
+                // -- Baris 2: BGM --
                 g2.setFont(new Font("Arial",Font.PLAIN,11));
                 g2.setColor(new Color(180,160,120));
-                g2.drawString("♪ BGM: " + AssetConfig.getMapBgmName(selectedMap), 10, 38);
+                g2.drawString("♪ BGM: " + AssetConfig.getMapBgmName(selectedMap), 10, 36);
 
+                // -- Baris 3: Deskripsi baris 1 --
                 g2.setColor(new Color(160,200,255));
-                String[] desc = AssetConfig.getMapDesc(selectedMap);
-                for (int i=0; i<desc.length; i++)
-                    g2.drawString("  " + desc[i], 10, 54+i*16);
+                g2.drawString("  " + (desc.length > 0 ? desc[0] : ""), 10, 54);
 
-                String sinergi = getSinergiText();
+                // -- Baris 4: Deskripsi baris 2 (jika ada) --
+                int nextY = 70;
+                if (desc.length > 1 && !desc[1].isEmpty()) {
+                    g2.drawString("  " + desc[1], 10, nextY);
+                    nextY += 16;
+                }
+
+                // -- Baris 5: Sinergi (jika ada) — SELALU di baris tersendiri --
                 if (!sinergi.isEmpty()) {
                     g2.setFont(new Font("Arial",Font.BOLD,11));
                     g2.setColor(new Color(100,255,150));
-                    g2.drawString("✨ Sinergi: " + sinergi, 10, 72);
+                    g2.drawString("✨ Sinergi: " + sinergi, 10, nextY);
                 }
+
                 g2.dispose();
             }
         };
@@ -382,7 +401,6 @@ public class PreGameScreen extends JFrame {
             "Terkunci", JOptionPane.WARNING_MESSAGE);
     }
 
-    // FIX-8: try-finally memastikan resetDialogTheme() selalu dipanggil
     private void confirmLogout() {
         applyDialogTheme();
         try {
@@ -403,11 +421,10 @@ public class PreGameScreen extends JFrame {
                 SwingUtilities.invokeLater(() -> new AuthScreen().setVisible(true));
             }
         } finally {
-            resetDialogTheme(); // ← FIX-8: selalu dipanggil meskipun terjadi exception
+            resetDialogTheme();
         }
     }
 
-    // FIX-8: try-finally memastikan resetDialogTheme() selalu dipanggil
     private void confirmExit() {
         applyDialogTheme();
         try {
@@ -425,7 +442,7 @@ public class PreGameScreen extends JFrame {
                 System.exit(0);
             }
         } finally {
-            resetDialogTheme(); // ← FIX-8: selalu dipanggil meskipun terjadi exception
+            resetDialogTheme();
         }
     }
 
@@ -440,14 +457,13 @@ public class PreGameScreen extends JFrame {
     }
 
     private void resetDialogTheme() {
-        // FIX-8: reset SEMUA 7 key yang di-set di applyDialogTheme()
         UIManager.put("OptionPane.background",        null);
         UIManager.put("Panel.background",             null);
         UIManager.put("OptionPane.messageForeground", null);
-        UIManager.put("OptionPane.messageFont",       null); // ← sebelumnya tidak di-reset
+        UIManager.put("OptionPane.messageFont",       null);
         UIManager.put("Button.background",            null);
         UIManager.put("Button.foreground",            null);
-        UIManager.put("Button.font",                  null); // ← sebelumnya tidak di-reset
+        UIManager.put("Button.font",                  null);
     }
 
     // ── Sinergi ─────────────────────────────────────────────────────────
@@ -481,10 +497,9 @@ public class PreGameScreen extends JFrame {
     // ── Start Game ───────────────────────────────────────────────────────
 
     private void startGame() {
-        // FIX-7: Fallback bertingkat agar playerName tidak pernah kosong
         playerName = nameField.getText().trim();
         if (playerName.isEmpty()) playerName = SessionManager.getInstance().getUsername();
-        if (playerName.isEmpty()) playerName = "Hero"; // ← FIX-7: fallback akhir
+        if (playerName.isEmpty()) playerName = "Hero";
 
         animTimer.stop();
         SoundManager.stopBGM();
@@ -623,7 +638,6 @@ public class PreGameScreen extends JFrame {
             });
             hoverTimer.start();
 
-            // FIX-6: Hentikan timer saat komponen tidak lagi ditampilkan
             addHierarchyListener(e -> {
                 if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0
                         && !isShowing()) {
@@ -782,7 +796,6 @@ public class PreGameScreen extends JFrame {
             });
             hoverTimer.start();
 
-            // FIX-6: Hentikan timer saat komponen tidak lagi ditampilkan
             addHierarchyListener(e -> {
                 if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0
                         && !isShowing()) {
